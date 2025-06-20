@@ -1,26 +1,21 @@
 import grpc
 from concurrent import futures
 import time
-
-import inference_pb2
-import inference_pb2_grpc
+from protos import inference_pb2, inference_pb2_grpc
 
 from services.model_service import ModelService
 
-# 实例化模型服务，模型目录和你之前一样
 MODEL_DIR = "/app/models"
 model_service = ModelService(MODEL_DIR)
 
-# 1. gRPC服务端实现
 class InferenceServiceServicer(inference_pb2_grpc.InferenceServiceServicer):
     def ChatStream(self, request, context):
-        # 这是流式回复（token/段落流式输出）
-        # 这里只是简单 mock，你可以用真实模型
+        # 正确用法：只赋值 oneof 中的一个字段
         for i in range(3):
-            yield inference_pb2.ChatResponse(token=f"回复分片 {i+1}", response_type="token")
+            yield inference_pb2.ChatResponse(token=f"回复分片 {i+1}")
             time.sleep(0.2)
-        # 最后发一个结尾
-        yield inference_pb2.ChatResponse(token="[DONE]", response_type="end")
+        # 结束标志，也只赋值 token
+        yield inference_pb2.ChatResponse(token="[DONE]")
 
     def ListAvailableModels(self, request, context):
         models = model_service.list_models()
