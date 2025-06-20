@@ -11,3 +11,4 @@ websockets
 pydantic-settings
 # ... 其他依赖
 python-multipart
+protobuf

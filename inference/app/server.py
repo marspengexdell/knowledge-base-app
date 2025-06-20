@@ -1,25 +1,28 @@
 import grpc
 from concurrent import futures
-import time
 from protos import inference_pb2, inference_pb2_grpc
-
 from services.model_service import ModelService
+from services.rag_service import RAGService   # 新增
 
 MODEL_DIR = "/app/models"
+RAG_DB_PATH = "/app/vector_db.pkl"
+EMBED_MODEL_PATH = "/app/models"  # 或填某embedding模型名
 model_service = ModelService(MODEL_DIR)
+rag_service = RAGService(embed_model_dir=EMBED_MODEL_PATH, db_path=RAG_DB_PATH)
 
 class InferenceServiceServicer(inference_pb2_grpc.InferenceServiceServicer):
     def ChatStream(self, request, context):
-        # oneof只能传一个字段，不能同时赋值多个
-        for i in range(3):
-            yield inference_pb2.ChatResponse(token=f"回复分片 {i+1}")
-            time.sleep(0.2)
-        # 标记结束
+        prompt = request.query
+        # RAG召回
+        kb_chunks = rag_service.query(prompt, topk=3)
+        rag_prompt = "检索到的知识片段：\n" + "\n---\n".join(kb_chunks) + f"\n\n用户问题：{prompt}"
+        for token in model_service.generate_stream(rag_prompt):
+            if token.strip():
+                yield inference_pb2.ChatResponse(token=token)
         yield inference_pb2.ChatResponse(token="[DONE]")
 
     def ListAvailableModels(self, request, context):
         models = model_service.list_models()
-        # 注意字段名必须和proto里的完全一致
         return inference_pb2.ModelListResponse(
             generation_models=models.get("generation_models", []),
             embedding_models=models.get("embedding_models", []),
@@ -29,8 +32,10 @@ class InferenceServiceServicer(inference_pb2_grpc.InferenceServiceServicer):
 
     def SwitchModel(self, request, context):
         model_name = request.model_name
-        model_type = request.model_type  # int类型，直接传给服务
-        ok = model_service.load_model(model_name, model_type)
+        model_type = request.model_type  # int
+        model_type_map = {1: "generation", 2: "embedding"}
+        type_str = model_type_map.get(model_type, "generation")
+        ok = model_service.load_model(model_name, type_str)
         if ok:
             return inference_pb2.SwitchModelResponse(success=True, message="模型切换成功")
         else:

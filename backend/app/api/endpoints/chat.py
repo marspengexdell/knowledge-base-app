@@ -1,69 +1,58 @@
 import logging
-import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import grpc
+from ...protos import inference_pb2, inference_pb2_grpc
 
-# --- Local Imports ---
-# Assuming the project structure allows this import path
-from ...core.grpc_client import grpc_client_manager
-from ...protos import inference_pb2
-
-# Create a new router for chat-related endpoints
 router = APIRouter()
+INFER_ADDR = "inference:50051"  # docker-compose服务名
 
-@router.websocket("/ws")
+@router.websocket("/chat/ws")
 async def websocket_chat(websocket: WebSocket):
-    """
-    Handles the real-time chat functionality over a WebSocket connection.
-    It acts as a proxy between the user's client and the gRPC inference service.
-    """
     await websocket.accept()
     logging.info(f"WebSocket connection accepted from {websocket.client.host}")
 
-    # Get the gRPC stub to communicate with the inference service
-    try:
-        stub = grpc_client_manager.get_stub()
-    except ConnectionError as e:
-        logging.error(f"gRPC connection error: {e}")
-        await websocket.close(code=1011, reason="Backend server cannot connect to AI service.")
-        return
+    # 创建 gRPC 连接（同步流）
+    channel = grpc.insecure_channel(INFER_ADDR)
+    stub = inference_pb2_grpc.InferenceServiceStub(channel)
 
     try:
         while True:
-            # 1. Wait for a message from the user's client
-            user_query = await websocket.receive_text()
-            logging.info(f"Received query from client: {user_query}")
-
-            # 2. Create a gRPC request object
-            grpc_request = inference_pb2.ChatRequest(query=user_query)
-
-            # 3. Call the gRPC service and handle the stream
-            try:
-                # The 'ChatStream' method returns an async stream iterator
-                async for grpc_response in stub.ChatStream(grpc_request):
-                    if grpc_response.token:
-                        # Stream the token back to the client
-                        await websocket.send_text(grpc_response.token)
-                    elif grpc_response.error_message:
-                        # If an error occurs in the AI service, send it to the client
-                        logging.error(f"Error from inference service: {grpc_response.error_message}")
-                        await websocket.send_text(f"[ERROR]: {grpc_response.error_message}")
-                        break # Stop processing this request on error
-
-            except grpc.aio.AioRpcError as e:
-                # Handle gRPC-specific errors (e.g., service unavailable)
-                logging.error(f"A gRPC error occurred: {e.details()}")
-                await websocket.send_text(f"[ERROR]: The AI service is currently unavailable. Details: {e.details()}")
-                # We can choose to break the loop or allow the user to try again
-                # For now, we continue the loop
+            # 前端应该发json，带 query
+            data = await websocket.receive_json()
+            user_query = data.get("query")
+            session_id = data.get("session_id", "")
+            if not user_query:
+                await websocket.send_json({"error": "query is required"})
                 continue
 
+            grpc_request = inference_pb2.ChatRequest(query=user_query, session_id=session_id)
+            try:
+                # 同步流式gRPC调用，阻塞主线程，所以用run_in_executor
+                def stream_tokens():
+                    for grpc_response in stub.ChatStream(grpc_request):
+                        if grpc_response.token:
+                            yield {"token": grpc_response.token}
+                        elif grpc_response.error_message:
+                            yield {"error": grpc_response.error_message}
+                            break
+
+                import asyncio
+                loop = asyncio.get_event_loop()
+                async for resp in _to_async_iter(loop, stream_tokens()):
+                    await websocket.send_json(resp)
+
+            except grpc.RpcError as e:
+                logging.error(f"gRPC error: {e}")
+                await websocket.send_json({"error": f"AI服务异常: {e.details()}"})
+                continue
 
     except WebSocketDisconnect:
         logging.info("WebSocket connection closed by client.")
     except Exception as e:
-        # Catch any other unexpected errors
-        logging.error(f"An unexpected error occurred in the chat WebSocket: {e}", exc_info=True)
-        # Attempt to inform the client before closing
-        await websocket.close(code=1011, reason=f"An internal server error occurred.")
+        logging.error(f"Unexpected WebSocket error: {e}", exc_info=True)
+        await websocket.close(code=1011, reason="Internal server error.")
 
+# 将同步生成器转 async 生成器
+async def _to_async_iter(loop, sync_gen):
+    for item in sync_gen:
+        yield item
