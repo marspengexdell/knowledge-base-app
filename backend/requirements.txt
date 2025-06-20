@@ -9,3 +9,5 @@ grpcio-tools
 websockets
 # 其它你需要的包
 pydantic-settings
+# ... 其他依赖
+python-multipart
