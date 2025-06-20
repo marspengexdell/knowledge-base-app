@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+requests         # ← 必须补上
+sqlmodel
+python-dotenv
+grpcio
+grpcio-tools
+websockets
+# 其它你需要的包
+pydantic-settings

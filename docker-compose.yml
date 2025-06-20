@@ -1,0 +1,85 @@
+version: '3.8'
+
+networks:
+  knowledge-net:
+    driver: bridge
+
+volumes:
+  vector_db_data:
+  models_data:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: './models'   # 主机下 models 目录
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: kb-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - INFERENCE_SERVER_URL=http://inference:50051
+      - VECTOR_DB_URL=http://vector-db:8000
+    depends_on:
+      - vector-db
+      - inference
+    networks:
+      - knowledge-net
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  inference:
+    build:
+      context: ./inference
+      dockerfile: Dockerfile
+    container_name: kb-inference
+    volumes:
+      - models_data:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - knowledge-net
+
+  vector-db:
+    image: chromadb/chroma:0.4.24
+    container_name: kb-vector-db
+    ports:
+      - "8001:8000"
+    volumes:
+      - vector_db_data:/chroma/chroma
+    networks:
+      - knowledge-net
+
+  frontend-admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile
+    container_name: kb-frontend-admin
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+    networks:
+      - knowledge-net
+
+  frontend-user:
+    build:
+      context: ./frontend-user
+      dockerfile: Dockerfile
+    container_name: kb-frontend-user
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - knowledge-net

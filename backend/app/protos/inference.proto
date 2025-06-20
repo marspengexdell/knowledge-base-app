@@ -1,0 +1,16 @@
+
+syntax = "proto3";
+
+package inference;
+
+service InferenceService {
+  rpc Generate (InferenceRequest) returns (InferenceResponse);
+}
+
+message InferenceRequest {
+  string prompt = 1;
+}
+
+message InferenceResponse {
+  string result = 1;
+}

@@ -1,0 +1,10 @@
+torch
+transformers
+safetensors
+fastapi   # 如果inference有rest接口
+uvicorn
+grpcio
+grpcio-tools
+numpy
+sentencepiece
+accelerate
