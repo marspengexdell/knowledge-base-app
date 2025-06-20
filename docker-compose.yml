@@ -11,19 +11,18 @@ volumes:
     driver_opts:
       type: 'none'
       o: 'bind'
-      device: './models'   # 宿主机下 models 目录，务必确保有这个目录（即 E:\knowledge-base-app\models）
+      device: './models'   # 宿主机下 models 目录，务必确保有这个目录
 
 services:
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: kb-backend
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      - models_data:/models       # 保证 /models 目录正确挂载
+      - models_data:/models
     environment:
       - INFERENCE_SERVER_URL=inference:50051
       - VECTOR_DB_URL=http://vector-db:8000
@@ -38,9 +37,8 @@ services:
     build:
       context: ./inference
       dockerfile: Dockerfile
-    container_name: kb-inference
     volumes:
-      - models_data:/app/models   # inference 服务也要用同样的 models 挂载
+      - models_data:/app/models
     deploy:
       resources:
         reservations:
@@ -53,7 +51,6 @@ services:
 
   vector-db:
     image: chromadb/chroma:0.4.24
-    container_name: kb-vector-db
     ports:
       - "8001:8000"
     volumes:
@@ -65,7 +62,6 @@ services:
     build:
       context: ./frontend-admin
       dockerfile: Dockerfile
-    container_name: kb-frontend-admin
     ports:
       - "8081:80"
     depends_on:
@@ -77,7 +73,6 @@ services:
     build:
       context: ./frontend-user
       dockerfile: Dockerfile
-    container_name: kb-frontend-user
     ports:
       - "8080:80"
     depends_on:
