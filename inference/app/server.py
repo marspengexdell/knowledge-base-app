@@ -1,58 +1,52 @@
-import os
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
-import uvicorn
+import grpc
+from concurrent import futures
+import time
+
+import inference_pb2
+import inference_pb2_grpc
 
 from services.model_service import ModelService
 
-# 初始化模型服务，模型目录用挂载的 /app/models
-MODEL_DIR = os.getenv("MODEL_DIR", "/app/models")
+# 实例化模型服务，模型目录和你之前一样
+MODEL_DIR = "/app/models"
 model_service = ModelService(MODEL_DIR)
 
-app = FastAPI()
+# 1. gRPC服务端实现
+class InferenceServiceServicer(inference_pb2_grpc.InferenceServiceServicer):
+    def ChatStream(self, request, context):
+        # 这是流式回复（token/段落流式输出）
+        # 这里只是简单 mock，你可以用真实模型
+        for i in range(3):
+            yield inference_pb2.ChatResponse(token=f"回复分片 {i+1}", response_type="token")
+            time.sleep(0.2)
+        # 最后发一个结尾
+        yield inference_pb2.ChatResponse(token="[DONE]", response_type="end")
 
-@app.get("/api/models")
-def list_models():
-    """
-    获取所有可用模型列表，分 generation/embedding 分类
-    """
-    return model_service.list_models()
+    def ListAvailableModels(self, request, context):
+        models = model_service.list_models()
+        return inference_pb2.ModelListResponse(
+            generation_models=models.get("generation_models", []),
+            embedding_models=models.get("embedding_models", []),
+            current_generation_model=models.get("current_generation_model", ""),
+            current_embedding_model=models.get("current_embedding_model", "")
+        )
 
-@app.post("/api/load")
-def load_model(model_name: str, model_type: str = 'generation'):
-    """
-    动态加载模型（热切换），支持 generation/embedding
-    """
-    ok = model_service.load_model(model_name, model_type)
-    if not ok:
-        raise HTTPException(status_code=400, detail="模型加载失败")
-    return {"msg": "模型已加载", "current_model": model_name, "type": model_type}
+    def SwitchModel(self, request, context):
+        model_name = request.model_name
+        model_type = request.model_type
+        ok = model_service.load_model(model_name, model_type)
+        if ok:
+            return inference_pb2.SwitchModelResponse(success=True, message="模型切换成功")
+        else:
+            return inference_pb2.SwitchModelResponse(success=False, message="模型切换失败")
 
-@app.get("/api/status")
-def status():
-    """
-    查看当前加载的模型状态
-    """
-    return model_service.status()
+def serve():
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+    inference_pb2_grpc.add_InferenceServiceServicer_to_server(InferenceServiceServicer(), server)
+    server.add_insecure_port('[::]:50051')
+    print("gRPC server started on port 50051")
+    server.start()
+    server.wait_for_termination()
 
-@app.post("/api/generate")
-def generate(prompt: str, model_name: str = None):
-    """
-    文本生成接口，支持临时切换模型
-    """
-    result = model_service.generate(prompt, model_name)
-    return {"result": result}
-
-@app.post("/api/embed")
-def embed(text: str, model_name: str = None):
-    """
-    文本向量化接口，支持临时切换 embedding 模型
-    """
-    result = model_service.embed(text, model_name)
-    return {"embedding": result}
-
-# 下面是 gRPC 服务器启动的部分（用 gunicorn/多进程可选，或你原来的 proto 实现）
-
-if __name__ == "__main__":
-    # FastAPI 启动，生产用 gunicorn/uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=50051)
+if __name__ == '__main__':
+    serve()
