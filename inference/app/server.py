@@ -10,15 +10,16 @@ model_service = ModelService(MODEL_DIR)
 
 class InferenceServiceServicer(inference_pb2_grpc.InferenceServiceServicer):
     def ChatStream(self, request, context):
-        # 正确用法：只赋值 oneof 中的一个字段
+        # oneof只能传一个字段，不能同时赋值多个
         for i in range(3):
             yield inference_pb2.ChatResponse(token=f"回复分片 {i+1}")
             time.sleep(0.2)
-        # 结束标志，也只赋值 token
+        # 标记结束
         yield inference_pb2.ChatResponse(token="[DONE]")
 
     def ListAvailableModels(self, request, context):
         models = model_service.list_models()
+        # 注意字段名必须和proto里的完全一致
         return inference_pb2.ModelListResponse(
             generation_models=models.get("generation_models", []),
             embedding_models=models.get("embedding_models", []),
@@ -28,7 +29,7 @@ class InferenceServiceServicer(inference_pb2_grpc.InferenceServiceServicer):
 
     def SwitchModel(self, request, context):
         model_name = request.model_name
-        model_type = request.model_type
+        model_type = request.model_type  # int类型，直接传给服务
         ok = model_service.load_model(model_name, model_type)
         if ok:
             return inference_pb2.SwitchModelResponse(success=True, message="模型切换成功")

@@ -1,13 +1,13 @@
 import os
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 
 class ModelService:
     def __init__(self, model_dir: str):
         self.model_dir = model_dir
         self.current_generation_model = None
-        self.current_generation_model_name = None
+        self.current_generation_model_name = ""
         self.current_embedding_model = None
-        self.current_embedding_model_name = None
+        self.current_embedding_model_name = ""
         self._scan_models()
 
     def _scan_models(self):
@@ -21,26 +21,47 @@ class ModelService:
                 else:
                     self.available_models['generation'].append(filename)
 
-    def list_models(self) -> Dict[str, List[str]]:
+    def list_models(self) -> Dict[str, Union[List[str], str]]:
         self._scan_models()  # 每次调用都刷新
-        return self.available_models
+        return {
+            'generation_models': self.available_models['generation'],
+            'embedding_models': self.available_models['embedding'],
+            'current_generation_model': self.current_generation_model_name,
+            'current_embedding_model': self.current_embedding_model_name,
+        }
 
-    def load_model(self, model_name: str, model_type: Optional[str] = None) -> bool:
-        """热切换/按需加载模型。model_type: 'generation' or 'embedding'"""
+    def _modeltype_to_str(self, model_type) -> Optional[str]:
+        """支持 int/str 格式的 model_type（enum 映射）"""
+        # 通常 proto enum：0=UNKNOWN, 1=GENERATION, 2=EMBEDDING
+        if isinstance(model_type, int):
+            if model_type == 1: return "generation"
+            if model_type == 2: return "embedding"
+        if isinstance(model_type, str):
+            t = model_type.lower()
+            if t in ("generation", "gen"): return "generation"
+            if t in ("embedding", "embed"): return "embedding"
+        return None
+
+    def load_model(self, model_name: str, model_type: Optional[Union[str, int]] = None) -> bool:
+        """热切换/按需加载模型。model_type: 'generation'/'embedding'/1/2"""
         model_path = os.path.join(self.model_dir, model_name)
         if not os.path.exists(model_path):
+            print("模型文件不存在", model_path)
             return False
-        if model_type is None:
+        # 统一处理 model_type，优先显式参数
+        mtype = self._modeltype_to_str(model_type)
+        if not mtype:
             lower = model_name.lower()
-            model_type = 'embedding' if 'embed' in lower or 'embedding' in lower else 'generation'
+            mtype = 'embedding' if 'embed' in lower or 'embedding' in lower else 'generation'
         try:
-            if model_type == 'generation':
+            if mtype == 'generation':
                 self.current_generation_model = self._load_local_llm(model_path)
                 self.current_generation_model_name = model_name
-            elif model_type == 'embedding':
+            elif mtype == 'embedding':
                 self.current_embedding_model = self._load_local_embedding(model_path)
                 self.current_embedding_model_name = model_name
             else:
+                print("不支持的模型类型", model_type)
                 return False
             return True
         except Exception as e:
@@ -49,12 +70,10 @@ class ModelService:
 
     def _load_local_llm(self, model_path):
         """本地加载生成模型（示例）"""
-        # 这里替换成你实际的 LLM 加载代码（如 llama.cpp/transformers）
         return f"[MockGenModel:{model_path}]"
 
     def _load_local_embedding(self, model_path):
         """本地加载embedding模型（示例）"""
-        # 这里替换成 sentence-transformers/llama.cpp embedding 加载
         return f"[MockEmbedModel:{model_path}]"
 
     def generate(self, prompt: str, model_name: Optional[str] = None) -> str:
