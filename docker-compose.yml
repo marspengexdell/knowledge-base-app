@@ -1,4 +1,4 @@
-version: '3.8'
+# docker-compose.yml
 
 networks:
   knowledge-net:
@@ -11,7 +11,7 @@ volumes:
     driver_opts:
       type: 'none'
       o: 'bind'
-      device: './models'   # 主机下 models 目录
+      device: './models'   # 宿主机下的 models 目录，务必确保有这个目录
 
 services:
   backend:
@@ -23,8 +23,9 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - models_data:/models            # 关键修正：挂载 models 目录到 /models
     environment:
-      - INFERENCE_SERVER_URL=http://inference:50051
+    - INFERENCE_SERVER_URL=inference:50051
       - VECTOR_DB_URL=http://vector-db:8000
     depends_on:
       - vector-db
