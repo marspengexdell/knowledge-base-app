@@ -8,3 +8,4 @@ fastapi
 uvicorn
 llama-cpp-python[cuda]
 faiss-gpu
+sentence-transformers
