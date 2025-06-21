@@ -1,4 +1,6 @@
-version: '3.8'
+# docker-compose.yml
+
+# 你可以安全去掉 version 字段，兼容所有新版 Docker Compose
 
 networks:
   knowledge-net:
@@ -11,34 +13,45 @@ volumes:
     driver_opts:
       type: 'none'
       o: 'bind'
-      device: './models'   # 宿主机下 models 目录，务必确保有这个目录
+      device: './models'   # 宿主机 models 目录（需提前存在）
 
 services:
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kb-backend
     ports:
-      - "8000:8000"
+      - "8000:8000"                   # FastAPI/后端API端口
     volumes:
-      - ./backend:/app
-      - models_data:/models
+      - ./backend:/app                # 源码挂载（开发/调试用，生产可去掉）
+      - models_data:/models           # 挂载AI模型目录
     environment:
       - INFERENCE_SERVER_URL=inference:50051
       - VECTOR_DB_URL=http://vector-db:8000
+      # 其他配置可用 env_file: - ./backend/.env
     depends_on:
       - vector-db
       - inference
     networks:
       - knowledge-net
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
 
   inference:
     build:
       context: ./inference
       dockerfile: Dockerfile
+    container_name: kb-inference
     volumes:
-      - models_data:/app/models
+      - models_data:/models                # 路径统一：容器内为 /models
+    # 如需本地调试可开放 gRPC 端口（如需则取消注释）
+    # ports:
+    #   - "50051:50051"
     deploy:
       resources:
         reservations:
@@ -48,20 +61,33 @@ services:
               capabilities: [gpu]
     networks:
       - knowledge-net
+    # 不要有 depends_on: - backend，避免循环依赖！
+    healthcheck:
+      test: ["CMD", "ls", "/models"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   vector-db:
     image: chromadb/chroma:0.4.24
+    container_name: kb-vector-db
     ports:
-      - "8001:8000"
+      - "8001:8000"                       # 宿主机8001 -> 容器8000
     volumes:
       - vector_db_data:/chroma/chroma
     networks:
       - knowledge-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
 
   frontend-admin:
     build:
       context: ./frontend-admin
       dockerfile: Dockerfile
+    container_name: kb-frontend-admin
     ports:
       - "8081:80"
     depends_on:
@@ -73,6 +99,7 @@ services:
     build:
       context: ./frontend-user
       dockerfile: Dockerfile
+    container_name: kb-frontend-user
     ports:
       - "8080:80"
     depends_on:
