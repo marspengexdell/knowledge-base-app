@@ -1,88 +1,41 @@
 import os
-import pickle
-import faiss
-from sentence_transformers import SentenceTransformer
+from llama_cpp import Llama
 
-class RAGService:
-    def __init__(self, embed_model_dir: str = None, db_path: str = None):
-        self.text_chunks = []
-        self.index = None
-        self.db_path = db_path
-        self.embedder = None
-        if embed_model_dir and os.path.exists(embed_model_dir):
-            try:
-                self.embedder = SentenceTransformer(embed_model_dir)
-                print(f"[INFO] 成功加载embedding模型: {embed_model_dir}")
-            except Exception as e:
-                print(f"[WARN] 加载embedding模型失败: {e}")
-        if db_path:
-            self._load_db()
+class ModelService:
+    def __init__(self):
+        self.model_dir = "/app/models"  # 必须和docker一致
+        self.current_generation_model = None
+        self.current_generation_model_name = ""
+        self.current_embedding_model = None
+        self.current_embedding_model_name = ""
+        self._scan_models()
 
-    def _load_db(self):
-        if os.path.exists(self.db_path):
-            with open(self.db_path, "rb") as f:
-                self.text_chunks, vecs = pickle.load(f)
-                if len(vecs) == 0:
-                    self.index = None
-                    return
-                d = len(vecs[0])
-                self.index = faiss.IndexFlatL2(d)
-                self.index.add(vecs)
-        else:
-            self.index = None
-            self.text_chunks = []
+    def _scan_models(self):
+        self.available_models = {"generation": [], "embedding": []}
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir)
+        for filename in os.listdir(self.model_dir):
+            if filename.endswith('.gguf') or filename.endswith('.safetensors'):
+                lower = filename.lower()
+                if 'embed' in lower or 'embedding' in lower:
+                    self.available_models['embedding'].append(filename)
+                else:
+                    self.available_models['generation'].append(filename)
+        # 递归embedding-model子目录
+        embedding_subdir = os.path.join(self.model_dir, "embedding-model")
+        if os.path.isdir(embedding_subdir):
+            for subdir in os.listdir(embedding_subdir):
+                self.available_models['embedding'].append(os.path.join("embedding-model", subdir))
 
-    def ingest(self, txt_file: str):
-        if self.embedder is None:
-            print("[WARN] 未加载embedding模型，无法ingest文档")
-            return 0
-        with open(txt_file, "r", encoding="utf-8") as f:
-            text = f.read()
-        chunks = [text[i:i+200] for i in range(0, len(text), 200)]
-        try:
-            emb = self.embedder.encode(chunks, show_progress_bar=True)
-        except Exception as e:
-            print(f"[ERR] 文本embedding失败: {e}")
-            return 0
-        if self.index is None:
-            self.index = faiss.IndexFlatL2(emb.shape[1])
-            self.text_chunks = []
-        self.index.add(emb)
-        self.text_chunks.extend(chunks)
-        # 注意这里保存emb（向量）更好，reconstruct_n只适合Flat索引
-        with open(self.db_path, "wb") as f:
-            pickle.dump((self.text_chunks, emb), f)
-        return len(chunks)
+    def load_generation_model(self, model_name):
+        path = os.path.join(self.model_dir, model_name)
+        self.current_generation_model = Llama(model_path=path, n_ctx=2048)
+        self.current_generation_model_name = model_name
 
-    def query(self, query: str, topk=3):
-        if self.index is None or self.embedder is None or not self.text_chunks:
-            return []
-        try:
-            q_emb = self.embedder.encode([query])
-            D, I = self.index.search(q_emb, topk)
-            results = []
-            for idx, score in zip(I[0], D[0]):
-                if idx < 0 or idx >= len(self.text_chunks):
-                    continue
-                results.append({"text": self.text_chunks[idx], "score": float(score)})
-            return results
-        except Exception as e:
-            print(f"[ERR] 检索失败: {e}")
-            return []
+    def load_embedding_model(self, embedding_model_dir):
+        # 这里视你实际embedding模型加载方式而定
+        path = os.path.join(self.model_dir, embedding_model_dir)
+        # 加载embedding逻辑...
+        self.current_embedding_model_name = embedding_model_dir
 
-# 空实现
-class DummyRAGService:
-    def __init__(self, *args, **kwargs):
-        pass
-    def ingest(self, txt_file: str):
-        print("[INFO] 未启用知识库，ingest操作跳过")
-        return 0
-    def query(self, query: str, topk=3):
-        print("[INFO] 未启用知识库，query返回空")
-        return []
-
-# 工厂模式
-def get_rag_service(embed_model_dir, db_path):
-    if not (embed_model_dir and os.path.exists(embed_model_dir)):
-        return DummyRAGService()
-    return RAGService(embed_model_dir, db_path)
+    # 其他相关函数...
