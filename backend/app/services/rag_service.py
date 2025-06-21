@@ -1,13 +1,13 @@
 import os
 from typing import List, Dict, Optional
-from .model_service import ModelService
+from .model_service import RAGService
 
 # 假定知识库文档简单保存在文本文件，或后续可对接 ChromaDB
 KNOWLEDGE_DIR = "/data/knowledge"   # 文档存放路径
 
 class RAGService:
     def __init__(self, model_dir: str, knowledge_dir: Optional[str] = None):
-        self.model_service = ModelService(model_dir)
+        self.model_service = RAGService(model_dir)
         self.knowledge_dir = knowledge_dir or KNOWLEDGE_DIR
 
     def _load_knowledge_texts(self) -> List[str]:
@@ -59,5 +59,5 @@ class RAGService:
         return self.model_service.generate(prompt)
 
 # 单例（如果需要可以全局用）
-# rag_service = RAGService(model_dir="/app/models", knowledge_dir="/data/knowledge")
+# rag_service = RAGService(model_dir="/models", knowledge_dir="/data/knowledge")
 
