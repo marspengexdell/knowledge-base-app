@@ -59,5 +59,5 @@ class RAGService:
         return self.model_service.generate(prompt)
 
 # 单例（如果需要可以全局用）
-# rag_service = RAGService(model_dir="/app/models", knowledge_dir="/data/knowledge")
+# rag_service = RAGService(model_dir="/models", knowledge_dir="/data/knowledge")
 
