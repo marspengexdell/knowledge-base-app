@@ -1,5 +1,7 @@
 import os
+import logging
 from typing import List, Dict, Optional, Union
+from threading import Lock
 
 # llama-cpp-python 必须 import
 from llama_cpp import Llama
@@ -12,9 +14,12 @@ class ModelService:
         self.current_embedding_model = None  # 可后续扩展
         self.current_embedding_model_name = ""
         self._scan_models()
+        self._load_lock = Lock()
 
     def _scan_models(self):
         self.available_models = {'generation': [], 'embedding': []}
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir)
         for filename in os.listdir(self.model_dir):
             if filename.endswith('.gguf') or filename.endswith('.safetensors'):
                 lower = filename.lower()
@@ -45,33 +50,37 @@ class ModelService:
     def load_model(self, model_name: str, model_type: Optional[Union[str, int]] = None) -> bool:
         model_path = os.path.join(self.model_dir, model_name)
         if not os.path.exists(model_path):
-            print("模型文件不存在", model_path)
+            logging.error(f"模型文件不存在: {model_path}")
             return False
         mtype = self._modeltype_to_str(model_type)
         if not mtype:
             lower = model_name.lower()
             mtype = 'embedding' if 'embed' in lower or 'embedding' in lower else 'generation'
         try:
-            if mtype == 'generation':
-                # 直接加载 GGUF
-                self.current_generation_model = Llama(model_path=model_path, n_ctx=2048)
-                self.current_generation_model_name = model_name
-            elif mtype == 'embedding':
-                # 这里留空，或你自己集成 embedding 模型
-                self.current_embedding_model = None
-                self.current_embedding_model_name = model_name
-            else:
-                print("不支持的模型类型", model_type)
-                return False
+            with self._load_lock:  # 保证切换线程安全
+                if mtype == 'generation':
+                    if self.current_generation_model is not None:
+                        try:
+                            del self.current_generation_model
+                        except Exception as e:
+                            logging.warning(f"释放旧模型失败: {e}")
+                    self.current_generation_model = Llama(model_path=model_path, n_ctx=2048)
+                    self.current_generation_model_name = model_name
+                    logging.info(f"已加载生成模型: {model_name}")
+                elif mtype == 'embedding':
+                    # TODO: 这里扩展 embedding 模型加载
+                    self.current_embedding_model = None
+                    self.current_embedding_model_name = model_name
+                    logging.info(f"已加载嵌入模型: {model_name}")
+                else:
+                    logging.error(f"不支持的模型类型: {model_type}")
+                    return False
             return True
         except Exception as e:
-            print(f"模型加载失败: {e}")
+            logging.error(f"模型加载失败: {e}", exc_info=True)
             return False
 
     def generate_stream(self, prompt: str, model_name: Optional[str] = None):
-        """
-        生成内容流（token流式输出），返回生成 token 的迭代器
-        """
         if model_name and model_name != self.current_generation_model_name:
             ok = self.load_model(model_name, model_type='generation')
             if not ok:
@@ -80,14 +89,18 @@ class ModelService:
         if not self.current_generation_model:
             yield "[ERROR] 当前未加载生成模型"
             return
-
-        # llama.cpp 迭代流式输出
-        for chunk in self.current_generation_model(prompt=prompt, stream=True, max_tokens=512, stop=["[DONE]"]):
-            # 每个 chunk 是字典，内容在 chunk['choices'][0]['text']
-            yield chunk['choices'][0]['text']
+        try:
+            for chunk in self.current_generation_model(
+                prompt=prompt, stream=True, max_tokens=512, stop=["[DONE]"]
+            ):
+                # llama.cpp-python返回的 chunk 格式一般为 {'choices':[{'text':...}]}
+                yield chunk['choices'][0]['text']
+        except Exception as e:
+            logging.error(f"推理时发生异常: {e}", exc_info=True)
+            yield f"[ERROR] 推理异常: {e}"
 
     def generate(self, prompt: str, model_name: Optional[str] = None) -> str:
-        # 非流式用法，直接返回全部
         return "".join(self.generate_stream(prompt, model_name))
 
-    # ...embed和status等其它函数如前...
+    # 其它 embed/status 方法同前，略
+
