@@ -5,9 +5,9 @@ from protos import inference_pb2, inference_pb2_grpc
 from services.model_service import ModelService
 from services.rag_service import RAGService
 
-MODEL_DIR = "/app/models"
+MODEL_DIR = "/models"
 RAG_DB_PATH = "/app/vector_db.pkl"
-EMBED_MODEL_PATH = "/app/models/embedding-model/bge-base-zh"  # 请确保该目录下有config.json、pytorch_model.bin等
+EMBED_MODEL_PATH = "/models/embedding-model/bge-base-zh"  # 请确保该目录下有config.json、pytorch_model.bin等
 
 model_service = ModelService(MODEL_DIR)
 rag_service = RAGService(embed_model_dir=EMBED_MODEL_PATH, db_path=RAG_DB_PATH)
