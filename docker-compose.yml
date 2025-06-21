@@ -10,7 +10,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      - models_data:/app/models   # 可选，便于前后端都能访问模型目录
+      - models_data:/models           # 统一挂载路径
     environment:
       - INFERENCE_SERVER_URL=inference:50051
       - VECTOR_DB_URL=http://vector-db:8000
@@ -32,11 +32,11 @@ services:
       dockerfile: Dockerfile
     container_name: inference
     volumes:
-      - models_data:/app/models    # 这里是核心：容器内统一用/app/models
+      - models_data:/models           # 统一挂载路径
     networks:
       - knowledge-net
     healthcheck:
-      test: ["CMD", "ls", "/app/models"]
+      test: ["CMD", "ls", "/models"]  # 统一检查路径
       interval: 30s
       timeout: 5s
       retries: 3
@@ -87,7 +87,7 @@ volumes:
     driver_opts:
       type: 'none'
       o: 'bind'
-      device: './models'  # 你的本地 E:\knowledge-base-app\models
+      device: './models'         # 你的本地物理路径
 
 networks:
   knowledge-net:

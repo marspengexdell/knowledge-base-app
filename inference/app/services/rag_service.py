@@ -3,7 +3,7 @@ from llama_cpp import Llama
 
 class ModelService:
     def __init__(self):
-        self.model_dir = "/app/models"  # 必须和docker一致
+        self.model_dir = "/models"
         self.current_generation_model = None
         self.current_generation_model_name = ""
         self.current_embedding_model = None
@@ -21,7 +21,7 @@ class ModelService:
                     self.available_models['embedding'].append(filename)
                 else:
                     self.available_models['generation'].append(filename)
-        # 递归embedding-model子目录
+        # 递归 embedding-model 子目录
         embedding_subdir = os.path.join(self.model_dir, "embedding-model")
         if os.path.isdir(embedding_subdir):
             for subdir in os.listdir(embedding_subdir):
@@ -33,9 +33,6 @@ class ModelService:
         self.current_generation_model_name = model_name
 
     def load_embedding_model(self, embedding_model_dir):
-        # 这里视你实际embedding模型加载方式而定
         path = os.path.join(self.model_dir, embedding_model_dir)
-        # 加载embedding逻辑...
+        # ...embedding加载逻辑...
         self.current_embedding_model_name = embedding_model_dir
-
-    # 其他相关函数...
