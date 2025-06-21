@@ -1,35 +1,19 @@
-# docker-compose.yml
-
-# 你可以安全去掉 version 字段，兼容所有新版 Docker Compose
-
-networks:
-  knowledge-net:
-    driver: bridge
-
-volumes:
-  vector_db_data:
-  models_data:
-    driver: local
-    driver_opts:
-      type: 'none'
-      o: 'bind'
-      device: './models'   # 宿主机 models 目录（需提前存在）
+version: '3.8'   # 可以加上兼容性更好
 
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: kb-backend
+    container_name: backend
     ports:
-      - "8000:8000"                   # FastAPI/后端API端口
+      - "8000:8000"
     volumes:
-      - ./backend:/app                # 源码挂载（开发/调试用，生产可去掉）
-      - models_data:/models           # 挂载AI模型目录
+      - ./backend:/app
+      - models_data:/models
     environment:
       - INFERENCE_SERVER_URL=inference:50051
       - VECTOR_DB_URL=http://vector-db:8000
-      # 其他配置可用 env_file: - ./backend/.env
     depends_on:
       - vector-db
       - inference
@@ -46,22 +30,11 @@ services:
     build:
       context: ./inference
       dockerfile: Dockerfile
-    container_name: kb-inference
+    container_name: inference
     volumes:
-      - models_data:/models                # 路径统一：容器内为 /models
-    # 如需本地调试可开放 gRPC 端口（如需则取消注释）
-    # ports:
-    #   - "50051:50051"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+      - models_data:/models
     networks:
       - knowledge-net
-    # 不要有 depends_on: - backend，避免循环依赖！
     healthcheck:
       test: ["CMD", "ls", "/models"]
       interval: 30s
@@ -70,9 +43,9 @@ services:
 
   vector-db:
     image: chromadb/chroma:0.4.24
-    container_name: kb-vector-db
+    container_name: vector-db
     ports:
-      - "8001:8000"                       # 宿主机8001 -> 容器8000
+      - "8001:8000"
     volumes:
       - vector_db_data:/chroma/chroma
     networks:
@@ -87,7 +60,7 @@ services:
     build:
       context: ./frontend-admin
       dockerfile: Dockerfile
-    container_name: kb-frontend-admin
+    container_name: frontend-admin
     ports:
       - "8081:80"
     depends_on:
@@ -99,10 +72,23 @@ services:
     build:
       context: ./frontend-user
       dockerfile: Dockerfile
-    container_name: kb-frontend-user
+    container_name: frontend-user
     ports:
       - "8080:80"
     depends_on:
       - backend
     networks:
       - knowledge-net
+
+volumes:
+  vector_db_data:
+  models_data:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: './models'
+
+networks:
+  knowledge-net:
+    driver: bridge
