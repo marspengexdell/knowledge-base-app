@@ -5,3 +5,4 @@ transformers
 torch
 fastapi
 uvicorn
+llama-cpp-python[cuda]
