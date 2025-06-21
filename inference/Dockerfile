@@ -15,18 +15,22 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN ln -sf /usr/bin/python3 /usr/bin/python
 
 WORKDIR /app
 
+# 先复制 requirements.txt 并装依赖
 COPY ./requirements.txt /app/requirements.txt
 RUN pip3 install --no-cache-dir --upgrade pip
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+# 复制源码（务必保证 app/server.py 存在）
 COPY ./app /app
 
-# 保证 protos/inference.proto 存在
-RUN python3 -m grpc_tools.protoc -I/app/protos --python_out=/app/protos --grpc_python_out=/app/protos /app/protos/inference.proto
+# 可选：自动生成 gRPC Python 文件（如果开发期有变）
+RUN if [ -f /app/protos/inference.proto ]; then \
+    python3 -m grpc_tools.protoc -I/app/protos --python_out=/app/protos --grpc_python_out=/app/protos /app/protos/inference.proto; \
+    fi
 
 EXPOSE 50051
 

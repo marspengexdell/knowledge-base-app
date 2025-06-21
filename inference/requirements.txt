@@ -1,3 +1,4 @@
+numpy==1.26.4
 grpcio
 grpcio-tools
 protobuf
@@ -6,3 +7,4 @@ torch
 fastapi
 uvicorn
 llama-cpp-python[cuda]
+faiss-gpu
