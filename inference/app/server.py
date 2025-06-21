@@ -3,11 +3,11 @@ from concurrent import futures
 import logging
 from protos import inference_pb2, inference_pb2_grpc
 from services.model_service import ModelService
-from services.rag_service import RAGService   # 新增
+from services.rag_service import RAGService
 
 MODEL_DIR = "/app/models"
 RAG_DB_PATH = "/app/vector_db.pkl"
-EMBED_MODEL_PATH = "/app/models"  # 或填某embedding模型名
+EMBED_MODEL_PATH = "/app/models/embedding-model/bge-base-zh"  # 请确保该目录下有config.json、pytorch_model.bin等
 
 model_service = ModelService(MODEL_DIR)
 rag_service = RAGService(embed_model_dir=EMBED_MODEL_PATH, db_path=RAG_DB_PATH)
@@ -15,16 +15,23 @@ rag_service = RAGService(embed_model_dir=EMBED_MODEL_PATH, db_path=RAG_DB_PATH)
 class InferenceServiceServicer(inference_pb2_grpc.InferenceServiceServicer):
     def ChatStream(self, request, context):
         prompt = request.query
-        session_id = getattr(request, 'session_id', "")  # 预留多轮
+        session_id = getattr(request, 'session_id', "")
         try:
             kb_chunks = rag_service.query(prompt, topk=3)
             if kb_chunks:
-                rag_prompt = "检索到的知识片段：\n" + "\n---\n".join(kb_chunks) + f"\n\n用户问题：{prompt}"
+                kb_texts = [chunk["text"] for chunk in kb_chunks]
+                rag_prompt = "检索到的知识片段：\n" + "\n---\n".join(kb_texts) + f"\n\n用户问题：{prompt}"
             else:
                 rag_prompt = f"用户问题：{prompt}"
+
+            logging.info(f"[RAG PROMPT]\n{rag_prompt}")
+            sent_token = False
             for token in model_service.generate_stream(rag_prompt):
-                if token.strip():
+                if token is not None:
+                    sent_token = True
                     yield inference_pb2.ChatResponse(token=token)
+            if not sent_token:
+                yield inference_pb2.ChatResponse(error_message="模型无输出，请检查模型或输入。")
             yield inference_pb2.ChatResponse(token="[DONE]")
         except Exception as e:
             logging.error(f"ChatStream error: {e}", exc_info=True)
@@ -59,6 +66,7 @@ class InferenceServiceServicer(inference_pb2_grpc.InferenceServiceServicer):
             return inference_pb2.SwitchModelResponse(success=False, message=f"模型切换异常: {e}")
 
 def serve():
+    logging.basicConfig(level=logging.INFO)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     inference_pb2_grpc.add_InferenceServiceServicer_to_server(InferenceServiceServicer(), server)
     server.add_insecure_port('[::]:50051')

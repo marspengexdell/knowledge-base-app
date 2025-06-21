@@ -12,6 +12,7 @@ class RAGService:
         if embed_model_dir and os.path.exists(embed_model_dir):
             try:
                 self.embedder = SentenceTransformer(embed_model_dir)
+                print(f"[INFO] 成功加载embedding模型: {embed_model_dir}")
             except Exception as e:
                 print(f"[WARN] 加载embedding模型失败: {e}")
         if db_path:

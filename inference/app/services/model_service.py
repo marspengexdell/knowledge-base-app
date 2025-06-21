@@ -3,7 +3,6 @@ import logging
 from typing import List, Dict, Optional, Union
 from threading import Lock
 
-# llama-cpp-python 必须 import
 from llama_cpp import Llama
 
 class ModelService:
@@ -90,17 +89,19 @@ class ModelService:
             yield "[ERROR] 当前未加载生成模型"
             return
         try:
+            any_output = False
             for chunk in self.current_generation_model(
                 prompt=prompt, stream=True, max_tokens=512, stop=["[DONE]"]
             ):
-                # llama.cpp-python返回的 chunk 格式一般为 {'choices':[{'text':...}]}
-                yield chunk['choices'][0]['text']
+                txt = chunk['choices'][0]['text']
+                if txt is not None:
+                    any_output = True
+                    yield txt
+            if not any_output:
+                yield "[ERROR] 推理无内容"
         except Exception as e:
             logging.error(f"推理时发生异常: {e}", exc_info=True)
             yield f"[ERROR] 推理异常: {e}"
 
     def generate(self, prompt: str, model_name: Optional[str] = None) -> str:
         return "".join(self.generate_stream(prompt, model_name))
-
-    # 其它 embed/status 方法同前，略
-

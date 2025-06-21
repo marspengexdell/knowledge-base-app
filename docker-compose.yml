@@ -1,4 +1,4 @@
-version: '3.8'   # 可以加上兼容性更好
+version: '3.8'
 
 services:
   backend:
@@ -10,7 +10,8 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      - models_data:/models
+      # 这里不用挂载模型，因为 backend 不直接用模型，但可以保留下面一行同步卷（非必须）
+      - models_data:/app/models
     environment:
       - INFERENCE_SERVER_URL=inference:50051
       - VECTOR_DB_URL=http://vector-db:8000
@@ -32,11 +33,11 @@ services:
       dockerfile: Dockerfile
     container_name: inference
     volumes:
-      - models_data:/models
+      - models_data:/app/models     # 重点修正：容器路径一定要 /app/models
     networks:
       - knowledge-net
     healthcheck:
-      test: ["CMD", "ls", "/models"]
+      test: ["CMD", "ls", "/app/models"]    # 这里也要用/app/models
       interval: 30s
       timeout: 5s
       retries: 3
@@ -87,7 +88,7 @@ volumes:
     driver_opts:
       type: 'none'
       o: 'bind'
-      device: './models'
+      device: './models'         # 只要你本地是 E:\knowledge-base-app\models 就不用改
 
 networks:
   knowledge-net:
