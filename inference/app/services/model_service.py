@@ -5,7 +5,7 @@ from threading import Lock
 
 from llama_cpp import Llama
 
-class ModelService:
+class RAGService:
     def __init__(self, model_dir: str):
         self.model_dir = model_dir
         self.current_generation_model = None  # Llama 对象
