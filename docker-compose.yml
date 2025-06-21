@@ -10,7 +10,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      - models_data:/models           # 统一挂载路径
+      - models_data:/models
     environment:
       - INFERENCE_SERVER_URL=inference:50051
       - VECTOR_DB_URL=http://vector-db:8000
@@ -32,11 +32,11 @@ services:
       dockerfile: Dockerfile
     container_name: inference
     volumes:
-      - models_data:/models           # 统一挂载路径
+      - models_data:/models
     networks:
       - knowledge-net
     healthcheck:
-      test: ["CMD", "ls", "/models"]  # 统一检查路径
+      test: ["CMD", "ls", "/models"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -87,7 +87,7 @@ volumes:
     driver_opts:
       type: 'none'
       o: 'bind'
-      device: './models'         # 你的本地物理路径
+      device: './models'
 
 networks:
   knowledge-net:

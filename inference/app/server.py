@@ -2,22 +2,20 @@ import grpc
 from concurrent import futures
 import logging
 from protos import inference_pb2, inference_pb2_grpc
-from services.model_service import RAGService as BaseRAGService
-from services.rag_service import RAGService
+from services.model_service import RAGService
 
 MODEL_DIR = "/models"
+EMBED_MODEL_DIR = "/models/embedding-model/bge-base-zh"
 RAG_DB_PATH = "/app/vector_db.pkl"
-EMBED_MODEL_PATH = "/models/embedding-model/bge-base-zh"  # 请确保该目录下有config.json、pytorch_model.bin等
 
-model_service = BaseRAGService(MODEL_DIR)
-rag_service = RAGService(embed_model_dir=EMBED_MODEL_PATH, db_path=RAG_DB_PATH)
+model_service = RAGService(model_dir=MODEL_DIR, embed_model_dir=EMBED_MODEL_DIR, db_path=RAG_DB_PATH)
 
 class InferenceServiceServicer(inference_pb2_grpc.InferenceServiceServicer):
     def ChatStream(self, request, context):
         prompt = request.query
         session_id = getattr(request, 'session_id', "")
         try:
-            kb_chunks = rag_service.query(prompt, topk=3)
+            kb_chunks = model_service.query(prompt, topk=3)
             if kb_chunks:
                 kb_texts = [chunk["text"] for chunk in kb_chunks]
                 rag_prompt = "检索到的知识片段：\n" + "\n---\n".join(kb_texts) + f"\n\n用户问题：{prompt}"

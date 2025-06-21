@@ -2,15 +2,16 @@ import os
 import logging
 from typing import List, Dict, Optional, Union
 from threading import Lock
-
 from llama_cpp import Llama
 
 class RAGService:
-    def __init__(self, model_dir: str):
+    def __init__(self, model_dir: str, embed_model_dir: str = None, db_path: str = None):
         self.model_dir = model_dir
-        self.current_generation_model = None  # Llama 对象
+        self.embed_model_dir = embed_model_dir
+        self.db_path = db_path
+        self.current_generation_model = None
         self.current_generation_model_name = ""
-        self.current_embedding_model = None  # 可后续扩展
+        self.current_embedding_model = None
         self.current_embedding_model_name = ""
         self._scan_models()
         self._load_lock = Lock()
@@ -26,6 +27,11 @@ class RAGService:
                     self.available_models['embedding'].append(filename)
                 else:
                     self.available_models['generation'].append(filename)
+        # 递归 embedding-model 子目录
+        embedding_subdir = os.path.join(self.model_dir, "embedding-model")
+        if os.path.isdir(embedding_subdir):
+            for subdir in os.listdir(embedding_subdir):
+                self.available_models['embedding'].append(os.path.join("embedding-model", subdir))
 
     def list_models(self) -> Dict[str, Union[List[str], str]]:
         self._scan_models()
@@ -105,3 +111,8 @@ class RAGService:
 
     def generate(self, prompt: str, model_name: Optional[str] = None) -> str:
         return "".join(self.generate_stream(prompt, model_name))
+
+    # 补充：假如你后续要写RAG检索，可以在这里实现
+    def query(self, query, topk=3):
+        # TODO: 这里写你自己的RAG向量检索逻辑
+        return []
