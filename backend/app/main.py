@@ -4,15 +4,12 @@ import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# --- Add protos to Python path ---
 sys.path.append(os.path.join(os.path.dirname(__file__), 'protos'))
 
-# --- Local Imports ---
 from .api.router import api_router
 from .core.config import settings
 from .core.grpc_client import grpc_client_manager
 
-# --- Setup logging ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = FastAPI(
@@ -21,7 +18,6 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# --- CORS Middleware ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
@@ -42,7 +38,6 @@ async def shutdown_event():
     await grpc_client_manager.disconnect()
     logging.info("gRPC client disconnected.")
 
-# --- Include API Routers ---
 app.include_router(api_router, prefix="/api")
 
 @app.get("/")
