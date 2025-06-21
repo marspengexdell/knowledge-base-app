@@ -29,18 +29,17 @@ async def websocket_chat(websocket: WebSocket):
             text = await websocket.receive_text()
             if not text.strip():
                 continue
+            # 尝试解析为JSON，否则作为纯文本处理
             try:
                 data = json.loads(text)
+                user_query = data.get("query") or data.get("msg") or ""
             except Exception:
-                await websocket.send_json({"error": "Invalid JSON"})
-                print(f"Invalid JSON received: {text}")
-                continue
-            user_query = data.get("query") or data.get("msg") or ""
+                user_query = text.strip()
             if not user_query:
                 await websocket.send_json({"error": "No query/msg in message"})
                 continue
 
-            # === 核心：调用gRPC AI推理 ===
+            # 调用gRPC AI推理
             try:
                 ai_reply = await grpc_client_manager.chat(user_query)
             except Exception as e:
