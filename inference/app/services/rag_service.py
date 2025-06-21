@@ -1,7 +1,7 @@
 import os
 from llama_cpp import Llama
 
-class ModelService:
+class RAGService:
     def __init__(self):
         self.model_dir = "/models"
         self.current_generation_model = None
