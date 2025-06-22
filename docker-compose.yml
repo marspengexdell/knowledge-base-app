@@ -31,6 +31,7 @@ services:
     container_name: inference
     volumes:
       - models_data:/models
+      - ./active_models.json:/models/active_models.json:ro
     networks:
       - knowledge-net
     healthcheck:
