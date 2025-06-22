@@ -22,11 +22,14 @@ class RAGService:
         # 自动加载第一个可用的生成模型（后台加载）
         if default_model and default_model in self.available_models['generation']:
             Thread(target=self.load_model, args=(default_model, 'generation', True), daemon=True).start()
-        else:
-            # 如果未指定默认模型，且存在生成模型，则加载第一个
-            if self.available_models['generation']:
-                first_model = self.available_models['generation'][0]
-                Thread(target=self.load_model, args=(first_model, 'generation', True), daemon=True).start()
+        elif self.available_models['generation']:
+            first_model = self.available_models['generation'][0]
+            Thread(target=self.load_model, args=(first_model, 'generation', True), daemon=True).start()
+
+        # 自动加载第一个嵌入模型
+        if self.available_models['embedding']:
+            first_embed = self.available_models['embedding'][0]
+            Thread(target=self.load_model, args=(first_embed, 'embedding', True), daemon=True).start()
 
     def _scan_models(self):
         self.available_models = {'generation': [], 'embedding': []}
