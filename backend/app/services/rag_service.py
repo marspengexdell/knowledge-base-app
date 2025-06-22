@@ -1,6 +1,7 @@
 import os
 from typing import List, Dict, Optional
-from .model_service import RAGService as ModelService
+# Reuse the inference service implementation
+from inference.app.services.model_service import RAGService as ModelService
 
 # 假定知识库文档简单保存在文本文件，或后续可对接 ChromaDB
 KNOWLEDGE_DIR = "/data/knowledge"   # 文档存放路径
