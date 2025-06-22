@@ -11,7 +11,7 @@ services:
       - ./backend/app:/app/app
       - ./models/active_models.json:/models/active_models.json
     environment:
-      - GRPC_SERVER_ADDRESS=inference:50051
+      - GRPC_SERVER=inference:50051
       - VECTOR_DB_HOST=vector-db
       - VECTOR_DB_PORT=8000
     depends_on:
