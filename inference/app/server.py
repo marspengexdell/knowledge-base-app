@@ -1,3 +1,5 @@
+# 文件：inference/app/server.py
+
 import grpc
 from concurrent import futures
 import logging
@@ -54,11 +56,9 @@ class InferenceServiceServicer(inference_pb2_grpc.InferenceServiceServicer):
             model_type = request.model_type  # int
             model_type_map = {1: "generation", 2: "embedding"}
             type_str = model_type_map.get(model_type, "generation")
-            ok = model_service.load_model(model_name, type_str)
-            if ok:
-                return inference_pb2.SwitchModelResponse(success=True, message="模型切换成功")
-            else:
-                return inference_pb2.SwitchModelResponse(success=False, message="模型切换失败")
+            # 异步后台加载模型
+            model_service.switch_model(model_name, type_str)
+            return inference_pb2.SwitchModelResponse(success=True, message="模型切换成功")
         except Exception as e:
             logging.error(f"SwitchModel error: {e}", exc_info=True)
             return inference_pb2.SwitchModelResponse(success=False, message=f"模型切换异常: {e}")
