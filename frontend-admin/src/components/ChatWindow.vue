@@ -74,7 +74,8 @@ function scrollToBottom() {
 // 连接 WebSocket
 function connectWs() {
   if (ws) ws.close();
-  ws = new WebSocket('ws://localhost:8000/chat/ws'); // 按需修改地址
+  const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${wsProtocol}://${location.host}/api/chat/ws`);
   ws.onopen = () => { /* 可提示连接成功 */ };
   ws.onerror = () => {
     error.value = '无法连接到AI服务，请稍后重试';
