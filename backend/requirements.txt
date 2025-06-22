@@ -1,3 +1,4 @@
+
 fastapi==0.110.0
 uvicorn==0.27.1
 pydantic==2.7.1
@@ -12,3 +13,18 @@ pydantic-settings==2.1.0
 # ... 其他依赖
 python-multipart==0.0.9
 protobuf==4.25.3
+fastapi>=0.110
+uvicorn>=0.24
+pydantic>=2.5
+requests>=2.31         # ← 必须补上
+sqlmodel>=0.0.16
+python-dotenv>=1.0
+grpcio>=1.56
+grpcio-tools>=1.56
+websockets>=12.0
+# 其它你需要的包
+pydantic-settings>=2.2
+# ... 其他依赖
+python-multipart>=0.0.7
+protobuf>=4.21
+
