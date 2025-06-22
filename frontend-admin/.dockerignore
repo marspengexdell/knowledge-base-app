@@ -1,0 +1,21 @@
+# Ignore version control
+.git
+.gitignore
+
+# Node modules and build output
+node_modules/
+dist/
+
+# Environment files
+.env
+*.env
+
+# Logs and temp files
+npm-debug.log*
+*.log
+*.tmp
+*.swp
+
+# Local data and models
+data/
+models/

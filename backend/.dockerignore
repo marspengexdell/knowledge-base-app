@@ -1,0 +1,25 @@
+# Ignore version control
+.git
+.gitignore
+
+# Python caches and compiled files
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment files
+.env
+*.env
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+
+# Local data and models
+data/
+models/
