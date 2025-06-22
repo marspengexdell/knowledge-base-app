@@ -75,3 +75,23 @@ must be JSON in the following form:
 
 The backend will update `models/active_models.json` with the selected
 generation model.
+
+### Regenerating gRPC Stubs
+
+If you modify `inference.proto`, regenerate the Python stubs so that both the
+`backend` and `inference` copies stay in sync. From the repository root run:
+
+```bash
+python -m grpc_tools.protoc -I backend/app/protos \
+    --python_out=backend/app/protos \
+    --grpc_python_out=backend/app/protos \
+    backend/app/protos/inference.proto
+python -m grpc_tools.protoc -I inference/app/protos \
+    --python_out=inference/app/protos \
+    --grpc_python_out=inference/app/protos \
+    inference/app/protos/inference.proto
+```
+
+Docker automatically performs this step during image builds, but keeping the
+generated files committed avoids mismatches between local sources and what the
+containers see at build time.
