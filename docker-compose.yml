@@ -1,93 +1,95 @@
+# Docker Compose 文件版本
+version: '3.8'
+
+# 定义所有服务
 services:
+  # 后端服务 (FastAPI)
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: backend
     ports:
-      - "8000:8000"
+      - "8000:8000" # 将主机的 8000 端口映射到容器的 8000 端口
     volumes:
-      - ./backend:/app
-      - models_data:/models
+      - ./backend/app:/app/app # 将本地的后端代码挂载到容器中，方便热重载
     environment:
-      - INFERENCE_SERVER_URL=inference:50051
-      - VECTOR_DB_URL=http://vector-db:8000
-    depends_on:
-      - vector-db
+      - GRPC_SERVER_ADDRESS=inference:50051 # 告知后端去连接名为'inference'的服务的50051端口
+      - VECTOR_DB_HOST=vector-db # 告知后端向量数据库的主机名
+      - VECTOR_DB_PORT=8000 # 告知后端向量数据库的端口
+    depends_on: # 确保在后端启动前，推理服务和向量数据库已启动
       - inference
-    networks:
-      - knowledge-net
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
-      interval: 20s
-      timeout: 5s
-      retries: 5
+      - vector-db
+    networks: # 将服务连接到同一个网络
+      - app-network
 
-  inference:
-    build:
-      context: ./inference
-      dockerfile: Dockerfile
-    container_name: inference
-    volumes:
-      - models_data:/models
-      - ./active_models.json:/models/active_models.json:ro
-    networks:
-      - knowledge-net
-    healthcheck:
-      test: ["CMD", "ls", "/models"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
-  vector-db:
-    image: chromadb/chroma:0.4.24
-    container_name: vector-db
-    ports:
-      - "8001:8000"
-    volumes:
-      - vector_db_data:/chroma/chroma
-    networks:
-      - knowledge-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-
-  frontend-admin:
-    build:
-      context: ./frontend-admin
-      dockerfile: Dockerfile
-    container_name: frontend-admin
-    ports:
-      - "8081:80"
-    depends_on:
-      - backend
-    networks:
-      - knowledge-net
-
+  # 用户前端服务 (Vue/React)
   frontend-user:
     build:
       context: ./frontend-user
       dockerfile: Dockerfile
-    container_name: frontend-user
     ports:
-      - "8080:80"
+      - "8080:80" # 将主机的 8080 端口映射到容器的 80 (nginx) 端口
     depends_on:
       - backend
     networks:
-      - knowledge-net
+      - app-network
 
+  # 管理后台前端服务 (Vue/React)
+  frontend-admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile
+    ports:
+      - "8081:80" # 将主机的 8081 端口映射到容器的 80 (nginx) 端口
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  # 推理服务 (Llama.cpp)
+  inference:
+    build:
+      context: ./inference
+      dockerfile: Dockerfile
+    volumes:
+      # 将本地的 models 目录挂载到容器的 /models 目录，'rw'代表读写权限
+      - ./models:/models:rw
+      # 将我们新创建的配置文件挂载到容器中，'ro'代表只读，防止程序意外修改
+      - ./inference/app/model_config.json:/app/model_config.json:ro
+    
+    # ------------------  👇 GPU 配置 - 这是关键！👇 ------------------
+    # 以下配置用于授权容器访问主机的 NVIDIA GPU
+    # 使用前，请确保您的主机已正确安装 NVIDIA 驱动和 NVIDIA Container Toolkit
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              # count: 1 代表分配一块 GPU。如果想使用所有 GPU，可以设置为 'all'
+              count: 1
+              # capabilities: [gpu] 是必须的，它赋予容器使用 GPU 的核心权限
+              capabilities: [gpu]
+    # ------------------  👆 GPU 配置结束 👆 ------------------
+    networks:
+      - app-network
+
+  # 向量数据库服务 (ChromaDB)
+  vector-db:
+    image: chromadb/chroma
+    ports:
+      # 将容器的 8000 端口映射到主机的 8001 端口，以避免与后端服务的 8000 端口冲突
+      - "8001:8000"
+    volumes:
+      # 将向量数据库的数据持久化到本地，防止容器重启后数据丢失
+      - chroma-data:/chroma/chroma
+    networks:
+      - app-network
+
+# 定义数据卷，用于持久化存储
 volumes:
-  vector_db_data:
-  models_data:
-    driver: local
-    driver_opts:
-      type: 'none'
-      o: 'bind'
-      device: './models'
+  chroma-data:
 
+# 定义自定义网络，让所有服务可以互相通信
 networks:
-  knowledge-net:
+  app-network:
     driver: bridge

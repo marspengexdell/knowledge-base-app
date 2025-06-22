@@ -1,0 +1,12 @@
+{
+  "model_chat_formats": {
+    "llama": "llama-2",
+    "qwen": "chatml",
+    "qwen2": "chatml",
+    "gemma": "gemma",
+    "chatglm": "chatglm3",
+    "mistral": "mistral",
+    "command-r": "command-r"
+  },
+  "default_chat_format": "llama-2"
+}
