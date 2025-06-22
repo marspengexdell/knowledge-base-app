@@ -1,40 +1,50 @@
-# 文件：backend/app/api/endpoints/admin.py
-
-from fastapi import APIRouter
-import grpc
-from ...core.config import settings
-from ...protos import inference_pb2, inference_pb2_grpc
+import os
+from fastapi import APIRouter, UploadFile, File
+from ....core.grpc_client import grpc_client_manager
+from ....core.config import settings
 
 router = APIRouter()
 
+@router.post("/models/upload")
+async def upload_model(file: UploadFile = File(...)):
+    # 保存上传的模型文件到指定目录
+    model_dir = settings.MODEL_DIR
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+    file_path = os.path.join(model_dir, file.filename)
+    content = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(content)
+    return {"success": True, "message": f"模型 {file.filename} 上传成功"}
+
 @router.post("/models/switch")
-def switch_model(data: dict):
+async def switch_model(data: dict):
     model_name = data.get("model_name")
     model_type = data.get("model_type", "generation")
-    # 将模型类型映射为 gRPC 中的枚举
-    type_enum = inference_pb2.GENERATION if model_type == "generation" else inference_pb2.EMBEDDING
-    # 调用 gRPC 服务切换模型
-    channel = grpc.insecure_channel(settings.GRPC_SERVER)
-    stub = inference_pb2_grpc.InferenceServiceStub(channel)
+    if not model_name:
+        return {"success": False, "message": "参数错误：缺少 model_name"}
+    await grpc_client_manager.connect()
     try:
-        resp = stub.SwitchModel(inference_pb2.SwitchModelRequest(model_name=model_name, model_type=type_enum))
-        return {"success": resp.success, "message": resp.message}
+        success, message = await grpc_client_manager.switch_model(model_name, model_type)
+        return {"success": success, "message": message}
     except Exception as e:
-        return {"success": False, "message": f"模型切换失败: {e}"}
+        return {"success": False, "message": f"切换模型失败: {e}"}
 
 @router.get("/models")
-def list_models():
-    # 调用 gRPC 服务获取模型列表
-    channel = grpc.insecure_channel(settings.GRPC_SERVER)
-    stub = inference_pb2_grpc.InferenceServiceStub(channel)
+async def list_models():
+    await grpc_client_manager.connect()
     try:
-        resp = stub.ListAvailableModels(inference_pb2.Empty())
-        return {
-            "generation_models": list(resp.generation_models),
-            "embedding_models": list(resp.embedding_models),
-            "current_generation_model": resp.current_generation_model,
-            "current_embedding_model": resp.current_embedding_model
-        }
+        models = await grpc_client_manager.list_models()
+        return models
     except Exception as e:
-        # 如果调用失败，返回空列表
-        return {"generation_models": [], "embedding_models": [], "current_generation_model": "", "current_embedding_model": ""}
+        return {"generation_models": [], "embedding_models": [], "current_generation_model": "", "current_embedding_model": "", "error": str(e)}
+
+@router.get("/models/status")
+async def get_model_status():
+    # 与 /models 接口返回内容相同
+    await grpc_client_manager.connect()
+    try:
+        models = await grpc_client_manager.list_models()
+        return models
+    except Exception as e:
+        return {"error": str(e)}
