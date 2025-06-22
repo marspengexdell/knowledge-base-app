@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package inference;
 
-option python_package = "app.protos";
 
 service InferenceService {
     rpc ChatStream (ChatRequest) returns (stream ChatResponse);
