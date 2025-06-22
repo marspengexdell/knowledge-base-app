@@ -1,5 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from ...core.config import settings
+from ...core.settings import settings
 from ...core.grpc_client import grpc_client_manager
 import json
 

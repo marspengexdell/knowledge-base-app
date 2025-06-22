@@ -1,7 +1,7 @@
 import os
 from fastapi import APIRouter, UploadFile, File
 from ...core.grpc_client import grpc_client_manager
-from ...core.config import settings
+from ...core.settings import settings
 
 router = APIRouter()
 
