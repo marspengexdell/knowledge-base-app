@@ -1,3 +1,6 @@
+import os, sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints.admin import admin_router
