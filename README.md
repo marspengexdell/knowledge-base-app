@@ -15,7 +15,7 @@ This repository contains a simple knowledge-base system built from several servi
 ### Prerequisites
 
 - Docker and Docker Compose installed
-- Optional: place your Llama or embedding models in the `models/` directory before starting
+- At least one `.gguf` or `.safetensors` model file under `models/` before starting (embedding model optional)
 
 ### Build and Run
 
@@ -38,6 +38,14 @@ Stop the stack with `Ctrl+C` or `docker compose down`.
 
 
 ### Adding Models
+
+Before starting the containers you must have at least one generation model
+available. Place a `.gguf` or `.safetensors` file directly in the `models/`
+folder **before** running `docker compose up`. For example:
+
+```bash
+cp ~/Downloads/my-llama-model.gguf models/
+```
 
 The inference service looks for generation and embedding models inside the `models/` directory, which is mounted into the containers. At least one generation model (`.gguf` or `.safetensors` file) must exist for the chat interface to produce responses. Place your Llama model file directly under `models/` and restart the stack.
 
