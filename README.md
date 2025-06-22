@@ -60,10 +60,9 @@ must be JSON in the following form:
 
 ```json
 {
-  "model_name": "your-model-file.gguf",
-  "model_type": "generation"
+  "model_name": "your-model-file.gguf"
 }
 ```
 
-Both fields are required. `model_type` should be either `generation` or
-`embedding`.
+The backend will update `backend/active_models.json` with the selected
+generation model.
