@@ -1,7 +1,8 @@
 import os
-from fastapi import APIRouter, UploadFile, File, Body
+from fastapi import APIRouter, UploadFile, File
 from ...core.grpc_client import grpc_client_manager
 from ...core.settings import settings
+from ..schemas.admin import ModelSwitchRequest
 
 router = APIRouter()
 
@@ -18,9 +19,9 @@ async def upload_model(file: UploadFile = File(...)):
     return {"success": True, "message": f"模型 {file.filename} 上传成功"}
 
 @router.post("/models/switch")
-async def switch_model(data: dict = Body(...)):
-    model_name = data.get("model_name")
-    model_type = data.get("model_type", "generation")
+async def switch_model(request: ModelSwitchRequest):
+    model_name = request.model_name
+    model_type = request.model_type
     if not model_name:
         return {"success": False, "message": "参数错误：缺少 model_name"}
     await grpc_client_manager.connect()
