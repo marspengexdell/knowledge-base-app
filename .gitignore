@@ -21,6 +21,7 @@ docker-compose.override.yml
 
 # Model files
 /models
+
 *.gguf
 *.safetensors
 *.bin
@@ -30,3 +31,14 @@ docker-compose.override.yml
 # OS or editor files
 .DS_Store
 *.swp
+
+Dict[str
+List[str]
+console.log(e.data)
+docker
+ws.send(JSON.stringify({query
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
