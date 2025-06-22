@@ -80,7 +80,7 @@ class RAGService:
                 model_path = os.path.join(self.model_dir, model_name)
                 logging.info(f"开始加载模型：{model_path}")
                 t0 = time.time()
-                model = Llama(model_path=model_path, n_ctx=2048)
+                model = Llama(model_path=model_path, n_ctx=2048, n_gpu_layers=-1)
                 with self.lock:
                     if model_type == "generation":
                         self.current_generation_model = model
