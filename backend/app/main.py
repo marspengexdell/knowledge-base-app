@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 sys.path.append(os.path.join(os.path.dirname(__file__), 'protos'))
 
 from .api.router import api_router
-from .core.config import settings
+from .core.settings import settings
 from .core.grpc_client import grpc_client_manager
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

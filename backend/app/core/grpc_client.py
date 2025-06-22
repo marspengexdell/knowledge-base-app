@@ -1,6 +1,6 @@
 import grpc
 from ..protos import inference_pb2, inference_pb2_grpc
-from ..core.config import settings
+from ..core.settings import settings
 
 class GrpcClientManager:
     def __init__(self):
