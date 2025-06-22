@@ -1,11 +1,12 @@
 import os
+import json
 import logging
 from threading import Lock, Thread
 from llama_cpp import Llama
 import time
 
 class RAGService:
-    def __init__(self, model_dir: str, default_model: str = None, embed_model_dir: str = None, db_path: str = None):
+    def __init__(self, model_dir: str, default_model: str = None, embed_model_dir: str = None, db_path: str = None, active_models_path: str | None = None):
         self.model_dir = model_dir
         self.embed_model_dir = embed_model_dir
         self.db_path = db_path
@@ -17,6 +18,8 @@ class RAGService:
         self.current_embedding_model = None
         self.current_embedding_model_name = ""
         self.available_models = {'generation': [], 'embedding': []}
+        self.active_models_path = active_models_path or os.path.join(self.model_dir, "active_models.json")
+        self._active_models_mtime = 0.0
         # 扫描模型目录
         self._scan_models()
         # 自动加载第一个可用的生成模型（后台加载）
@@ -30,6 +33,9 @@ class RAGService:
         if self.available_models['embedding']:
             first_embed = self.available_models['embedding'][0]
             Thread(target=self.load_model, args=(first_embed, 'embedding', True), daemon=True).start()
+
+        # Load models defined in active_models.json if present
+        self.reload_if_needed()
 
     def _scan_models(self):
         self.available_models = {'generation': [], 'embedding': []}
@@ -131,3 +137,27 @@ class RAGService:
     def query(self, prompt: str, topk: int = 3):
         # 检索模块暂时未实现，返回空列表
         return []
+
+    def reload_if_needed(self):
+        """Reload models if ``active_models.json`` was modified."""
+        if not os.path.exists(self.active_models_path):
+            return
+        try:
+            mtime = os.path.getmtime(self.active_models_path)
+            if mtime <= self._active_models_mtime:
+                return
+            self._active_models_mtime = mtime
+            with open(self.active_models_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            logging.error(f"Failed to read active models: {e}")
+            return
+
+        gen = data.get("generation")
+        if gen and gen != self.current_generation_model_name:
+            self.load_model(gen, "generation", async_mode=False)
+
+        embed = data.get("embedding")
+        if embed and embed != self.current_embedding_model_name:
+            self.load_model(embed, "embedding", async_mode=False)
+
