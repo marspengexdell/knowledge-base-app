@@ -1,6 +1,6 @@
 numpy==1.26.4
-grpcio==1.62.1
-grpcio-tools==1.62.1
+grpcio>=1.73.0
+grpcio-tools>=1.73.0
 protobuf>=6.31.0
 transformers
 torch
