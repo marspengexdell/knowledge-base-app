@@ -17,6 +17,7 @@ class InferenceServiceServicer(inference_pb2_grpc.InferenceServiceServicer):
         try:
             # 直接使用用户输入作为提示
             logging.info(f"[PROMPT] {prompt}")
+            model_service.reload_if_needed()
             sent_token = False
             for token in model_service.generate_stream(prompt):
                 if token is not None:
