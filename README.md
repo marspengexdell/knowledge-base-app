@@ -64,5 +64,5 @@ must be JSON in the following form:
 }
 ```
 
-The backend will update `backend/active_models.json` with the selected
+The backend will update `models/active_models.json` with the selected
 generation model.
