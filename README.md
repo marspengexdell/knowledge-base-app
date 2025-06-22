@@ -66,3 +66,17 @@ must be JSON in the following form:
 
 The backend will update `models/active_models.json` with the selected
 generation model.
+
+### Updating Dependencies
+
+The `backend` and `inference` services use pinned Python package versions
+defined in their respective `requirements.txt` files. If you modify these
+dependencies or encounter build/runtime errors, rebuild the Docker images to
+ensure the changes are applied:
+
+```bash
+docker compose build
+docker compose up
+```
+
+Rebuilding guarantees the containers use the updated packages.
