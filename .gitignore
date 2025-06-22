@@ -20,7 +20,8 @@ yarn-error.log*
 docker-compose.override.yml
 
 # Model files
-/models
+/models/*
+!/models/active_models.json
 
 *.gguf
 *.safetensors

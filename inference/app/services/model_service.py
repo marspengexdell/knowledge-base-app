@@ -18,7 +18,10 @@ class RAGService:
         self.current_embedding_model = None
         self.current_embedding_model_name = ""
         self.available_models = {'generation': [], 'embedding': []}
-        self.active_models_path = active_models_path or os.path.join(self.model_dir, "active_models.json")
+        # Path to the shared active models file. Defaults to the file mounted
+        # under ``/models`` so both the backend and inference services read
+        # and write the same configuration.
+        self.active_models_path = active_models_path or os.path.join("/models", "active_models.json")
         self._active_models_mtime = 0.0
         # 扫描模型目录
         self._scan_models()

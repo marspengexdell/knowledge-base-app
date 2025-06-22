@@ -3,7 +3,9 @@ import os
 from pathlib import Path
 
 MODEL_DIR = "/models"
-ACTIVE_MODELS_FILE = Path(__file__).resolve().parents[2] / "active_models.json"
+# Shared file storing the currently selected generation and embedding models.
+# It is mounted into both the backend and inference containers.
+ACTIVE_MODELS_FILE = Path("/models/active_models.json")
 
 def _ensure_file():
     if not ACTIVE_MODELS_FILE.exists():
