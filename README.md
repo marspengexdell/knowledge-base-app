@@ -44,3 +44,18 @@ The inference service looks for generation and embedding models inside the `mode
 Embedding models can be placed under `models/embedding-model/`. A list of URLs for an example embedding model is provided in `models/urls.txt`. Download the files to that folder if you want to enable embedding retrieval. When the inference service starts it will automatically load the first generation and embedding models it discovers.
 
 Once the files are in place you can visit `http://localhost:8081/model-management` to switch or upload models.
+
+### Switching Models via API
+
+The backend exposes a `POST /api/admin/models/switch` endpoint. The request body
+must be JSON in the following form:
+
+```json
+{
+  "model_name": "your-model-file.gguf",
+  "model_type": "generation"
+}
+```
+
+Both fields are required. `model_type` should be either `generation` or
+`embedding`.
