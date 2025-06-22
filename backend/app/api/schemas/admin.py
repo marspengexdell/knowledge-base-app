@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 
 class ModelSwitchRequest(BaseModel):
-    """Request body for switching models via the admin API."""
+    """Request body for switching the generation model."""
 
     model_name: str
-    model_type: str
