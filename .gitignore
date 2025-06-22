@@ -2,8 +2,8 @@ models/Qwen-7B-Chat.Q4_K_M.gguf
 models/model.safetensors
 models/Meta-Llama-3-8B.Q8_0.gguf
 /models
-
-__pycache__/
-*.pyc
-node_modules/
-dist/
+Dict[str
+List[str]
+console.log(e.data)
+docker
+ws.send(JSON.stringify({query
