@@ -25,6 +25,15 @@ From the repository root, execute:
 docker compose up --build
 ```
 
+If the build fails with an error such as `Option python_package unknown`, your
+Docker cache may still contain an old copy of `inference.proto`. Rebuilding
+without the cache ensures the latest proto file bundled with `grpcio-tools` is
+used:
+
+```bash
+docker compose build --no-cache backend
+```
+
 The services will be available on the following ports:
 
 - **Backend API** – [http://localhost:8000](http://localhost:8000)
