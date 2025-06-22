@@ -1,14 +1,14 @@
-fastapi
-uvicorn
-pydantic
-requests         # ← 必须补上
-sqlmodel
-python-dotenv
-grpcio
-grpcio-tools
-websockets
+fastapi>=0.110
+uvicorn>=0.24
+pydantic>=2.5
+requests>=2.31         # ← 必须补上
+sqlmodel>=0.0.16
+python-dotenv>=1.0
+grpcio>=1.56
+grpcio-tools>=1.56
+websockets>=12.0
 # 其它你需要的包
-pydantic-settings
+pydantic-settings>=2.2
 # ... 其他依赖
-python-multipart
-protobuf
+python-multipart>=0.0.7
+protobuf>=4.21
