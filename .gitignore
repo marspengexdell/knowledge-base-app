@@ -7,3 +7,7 @@ List[str]
 console.log(e.data)
 docker
 ws.send(JSON.stringify({query
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
