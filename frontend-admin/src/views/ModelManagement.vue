@@ -163,11 +163,12 @@ const handleSwitchModel = async (modelType) => {
   }
   loading[modelType] = true;
   try {
-    const params = new URLSearchParams();
-    params.append('model_name', modelName);
-    params.append('model_type', modelType);
+    const payload = {
+      model_name: modelName,
+      model_type: modelType,
+    };
 
-    const { data } = await axios.post('/api/admin/models/switch', params);
+    const { data } = await axios.post('/api/admin/models/switch', payload);
     ElMessage.success(data.message || '模型切换成功！');
     await fetchModels();
   } catch (error) {
