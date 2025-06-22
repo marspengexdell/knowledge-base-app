@@ -36,3 +36,11 @@ The backend connects to the inference service internally at `inference:50051` an
 
 Stop the stack with `Ctrl+C` or `docker compose down`.
 
+
+### Adding Models
+
+The inference service looks for generation and embedding models inside the `models/` directory, which is mounted into the containers. At least one generation model (`.gguf` or `.safetensors` file) must exist for the chat interface to produce responses. Place your Llama model file directly under `models/` and restart the stack.
+
+Embedding models can be placed under `models/embedding-model/`. A list of URLs for an example embedding model is provided in `models/urls.txt`. Download the files to that folder if you want to enable embedding retrieval.
+
+Once the files are in place you can visit `http://localhost:8081/model-management` to switch or upload models.
