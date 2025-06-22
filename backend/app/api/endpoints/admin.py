@@ -3,6 +3,7 @@ from fastapi import APIRouter, UploadFile, File
 from ...core.grpc_client import grpc_client_manager
 from ...core.settings import settings
 from ..schemas.admin import ModelSwitchRequest
+from ...services.model_store import list_models as list_available_models, switch_generation_model
 
 router = APIRouter()
 
@@ -21,31 +22,36 @@ async def upload_model(file: UploadFile = File(...)):
 @router.post("/models/switch")
 async def switch_model(request: ModelSwitchRequest):
     model_name = request.model_name
-    model_type = request.model_type
     if not model_name:
         return {"success": False, "message": "参数错误：缺少 model_name"}
     await grpc_client_manager.connect()
     try:
-        success, message = await grpc_client_manager.switch_model(model_name, model_type)
+        success, message = await grpc_client_manager.switch_model(model_name, "generation")
+        if success:
+            switch_generation_model(model_name)
         return {"success": success, "message": message}
     except Exception as e:
         return {"success": False, "message": f"切换模型失败: {e}"}
 
 @router.get("/models")
-async def list_models():
-    await grpc_client_manager.connect()
+async def get_models():
     try:
-        models = await grpc_client_manager.list_models()
+        models = list_available_models()
         return models
     except Exception as e:
-        return {"generation_models": [], "embedding_models": [], "current_generation_model": "", "current_embedding_model": "", "error": str(e)}
+        return {
+            "generation_models": [],
+            "embedding_models": [],
+            "current_generation_model": "",
+            "current_embedding_model": "",
+            "error": str(e),
+        }
 
 @router.get("/models/status")
 async def get_model_status():
     # 与 /models 接口返回内容相同
-    await grpc_client_manager.connect()
     try:
-        models = await grpc_client_manager.list_models()
+        models = list_available_models()
         return models
     except Exception as e:
         return {"error": str(e)}
