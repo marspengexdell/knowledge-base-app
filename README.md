@@ -16,6 +16,7 @@ This repository contains a simple knowledge-base system built from several servi
 
 - Docker and Docker Compose installed
 - At least one `.gguf` or `.safetensors` model file under `models/` before starting (embedding model optional)
+- Python package `protobuf` version 6.x
 
 ### Build and Run
 
@@ -33,6 +34,10 @@ used:
 ```bash
 docker compose build --no-cache backend
 ```
+
+The application depends on `protobuf` 6.x. If your images were built
+with an older major version, rebuild all services without the Docker
+cache to avoid import errors.
 
 The services will be available on the following ports:
 
