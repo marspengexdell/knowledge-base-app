@@ -1,79 +1,62 @@
-import os, sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
-
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import os
+import sys
+import logging
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints.admin import router as admin_router
 from app.api.endpoints.chat import router as chat_router
-from app.services.chat_service import ConnectionManager
-from app.core.settings import settings
-import grpc
-from app.protos import inference_pb2_grpc
-import logging
-import os # 引入 os 模块
+from app.core.grpc_client import grpc_client_manager
 
-# 配置日志
+# Add protos directory to Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
+
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
-
-# CORS 中间件，允许跨域请求
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+app = FastAPI(
+    title="Knowledge Base API",
+    description="API for interacting with the knowledge base and language models.",
+    version="1.0.0"
 )
 
-# WebSocket 连接管理器
-manager = ConnectionManager()
+# CORS Middleware to allow cross-origin requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
-# 包含其他路由
+# Include API routers
 app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
-app.include_router(chat_router, prefix="/api", tags=["chat"])
+app.include_router(chat_router, prefix="/api/chat", tags=["chat"]) # Correctly prefixed
 
 @app.on_event("startup")
 async def startup_event():
     """
-    应用启动时执行的事件
+    Application startup event: connect the gRPC client.
     """
     logger.info("Application startup...")
     try:
-        # --- 这是关键修改 ---
-        # 从环境变量中读取 gRPC 服务器地址
-        grpc_server_address = os.getenv("GRPC_SERVER", "localhost:50051")
-        logger.info(f"Connecting to gRPC server at: {grpc_server_address}")
-        
-        # 使用配置的地址建立 gRPC 连接
-        channel = grpc.aio.insecure_channel(grpc_server_address)
-        app.state.grpc_client = inference_pb2_grpc.InferenceServiceStub(channel)
-        
-        # 检查连接
-        await channel.channel_ready()
-        logger.info("gRPC client connected.")
-
+        await grpc_client_manager.connect()
+        logger.info("gRPC client connected successfully.")
     except Exception as e:
-        logger.error(f"Failed to connect to gRPC server: {e}", exc_info=True)
-        app.state.grpc_client = None
+        logger.error(f"Failed to connect to gRPC server on startup: {e}", exc_info=True)
 
-@app.websocket("/api/chat/ws")
-async def websocket_endpoint(websocket: WebSocket):
+@app.on_event("shutdown")
+async def shutdown_event():
     """
-    处理 WebSocket 连接
+    Application shutdown event: disconnect the gRPC client.
     """
-    await manager.connect(websocket)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            # 在这里可以处理接收到的消息，例如广播给其他客户端
-            # await manager.send_personal_message(f"You wrote: {data}", websocket)
-            # await manager.broadcast(f"Client #... says: {data}")
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        logger.info(f"Client disconnected: {websocket.client}")
+    logger.info("Application shutdown...")
+    await grpc_client_manager.disconnect()
+    logger.info("gRPC client disconnected.")
 
 @app.get("/")
 def read_root():
+    """
+    Root endpoint providing a welcome message.
+    """
     return {"message": "Welcome to the Knowledge Base App"}
