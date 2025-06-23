@@ -143,7 +143,7 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
         model = model_manager.get_model_instance()
         if model is None:
             logger.warning("Chat 请求失败，因为没有模型被加载。")
-            yield inference_pb2.ChatResponse(reply="[SYSTEM-ERROR] No model loaded. Please select a model first.")
+            yield inference_pb2.ChatResponse(error_message="[SYSTEM-ERROR] No model loaded. Please select a model first.")
             return
 
         messages = [{"role": req.role, "content": req.content} for req in request_iterator]
@@ -153,10 +153,10 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
             for output in stream:
                 content = output["choices"][0]["delta"].get("content")
                 if content:
-                    yield inference_pb2.ChatResponse(reply=content)
+                    yield inference_pb2.ChatResponse(token=content)
         except Exception as e:
             logger.error(f"聊天生成过程中出错: {e}", exc_info=True)
-            yield inference_pb2.ChatResponse(reply=f"[SYSTEM-ERROR] An error occurred during inference: {e}")
+            yield inference_pb2.ChatResponse(error_message=f"[SYSTEM-ERROR] An error occurred during inference: {e}")
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
