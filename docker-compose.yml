@@ -9,7 +9,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/app:/app/app
-      - ./models:/models           # <--- 挂载整个模型目录！千万别只挂单个文件
+      - ./models:/models
     environment:
       - GRPC_SERVER=inference:50051
       - VECTOR_DB_HOST=vector-db
@@ -49,13 +49,10 @@ services:
     volumes:
       - ./models:/models:rw
       - ./inference/app/model_config.json:/app/model_config.json:ro
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    gpus: all      # <-- 就加这里！！
     networks:
       - app-network
 
