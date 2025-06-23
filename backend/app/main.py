@@ -3,8 +3,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "protos"))
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.endpoints.admin import admin_router
-from app.api.endpoints.chat import chat_router
+from app.api.endpoints.admin import router as admin_router
+from app.api.endpoints.chat import router as chat_router
 from app.services.chat_service import ConnectionManager
 from app.core.config import settings
 import grpc
