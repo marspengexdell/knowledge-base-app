@@ -2,6 +2,7 @@ import grpc
 from concurrent import futures
 import logging
 import sys
+import os
 from protos import inference_pb2, inference_pb2_grpc
 
 # 将 services 包的路径添加到 sys.path
