@@ -62,21 +62,34 @@ class RAGService:
             self.generation_model = None
 
     def list_models(self):
-        """列出模型目录中所有可用的 GGUF 模型文件。"""
+        """列出模型目录中所有可用的生成与嵌入模型文件。"""
         logging.info(f"正在扫描模型目录: {self.model_dir}")
         generation_models = []
         embedding_models = []
-        
+
         try:
             if not os.path.exists(self.model_dir):
-                 logging.error(f"模型目录不存在: {self.model_dir}")
-                 return {}, {}
-            
+                logging.error(f"模型目录不存在: {self.model_dir}")
+                return {}, {}
+
             for filename in os.listdir(self.model_dir):
-                if filename.lower().endswith(".gguf"):
-                    generation_models.append(filename)
-            logging.info(f"找到 {len(generation_models)} 个生成模型: {generation_models}")
-            
+                if filename.endswith(".gguf") or filename.endswith(".safetensors"):
+                    lower = filename.lower()
+                    if "embed" in lower or "embedding" in lower:
+                        embedding_models.append(filename)
+                    else:
+                        generation_models.append(filename)
+
+            embed_dir = os.path.join(self.model_dir, "embedding-model")
+            if os.path.isdir(embed_dir):
+                for sub in os.listdir(embed_dir):
+                    if sub.endswith(".gguf") or sub.endswith(".safetensors"):
+                        embedding_models.append(os.path.join("embedding-model", sub))
+
+            logging.info(
+                f"找到 {len(generation_models)} 个生成模型, {len(embedding_models)} 个嵌入模型"
+            )
+
         except Exception as e:
             logging.error(f"扫描模型目录时出错: {e}", exc_info=True)
 
