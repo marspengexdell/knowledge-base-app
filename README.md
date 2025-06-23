@@ -93,7 +93,6 @@ docker compose up
 ```
 
 Rebuilding guarantees the containers use the updated packages.
-=======
 ### Regenerating gRPC Stubs
 
 If you modify `inference.proto`, regenerate the Python stubs so that both the
