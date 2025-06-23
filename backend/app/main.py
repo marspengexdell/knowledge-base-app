@@ -43,7 +43,7 @@ async def startup_event():
     try:
         # --- 这是关键修改 ---
         # 从环境变量中读取 gRPC 服务器地址
-        grpc_server_address = os.getenv("GRPC_SERVER_ADDRESS", "localhost:50051")
+        grpc_server_address = os.getenv("GRPC_SERVER", "localhost:50051")
         logger.info(f"Connecting to gRPC server at: {grpc_server_address}")
         
         # 使用配置的地址建立 gRPC 连接
