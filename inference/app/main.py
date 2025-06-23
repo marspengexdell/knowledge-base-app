@@ -122,16 +122,23 @@ class ModelManager:
 model_manager = ModelManager()
 
 class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
-    def GetModels(self, request, context):
+    def ListAvailableModels(self, request, context):
         try:
-            models = [f for f in os.listdir(MODELS_PATH) if f.endswith('.gguf')]
+            generation_models = [f for f in os.listdir(MODELS_PATH) if f.endswith('.gguf')]
         except FileNotFoundError:
             logger.error(f"模型目录 {MODELS_PATH} 不存在。")
-            models = []
-        
-        current_model = model_manager.get_current_model_name()
-        logger.info(f"gRPC GetModels 请求: 返回模型列表 {models}, 当前模型: {current_model}")
-        return inference_pb2.ModelList(models=models, current_model=current_model)
+            generation_models = []
+
+        current_generation_model = model_manager.get_current_model_name()
+        logger.info(
+            f"gRPC ListAvailableModels 请求: 返回模型列表 {generation_models}, 当前模型: {current_generation_model}"
+        )
+        return inference_pb2.ModelListResponse(
+            generation_models=generation_models,
+            embedding_models=[],
+            current_generation_model=current_generation_model,
+            current_embedding_model="",
+        )
 
     def SwitchModel(self, request, context):
         model_name = request.model_name
