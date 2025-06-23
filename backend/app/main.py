@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints.admin import router as admin_router
 from app.api.endpoints.chat import router as chat_router
 from app.services.chat_service import ConnectionManager
-from app.core.config import settings
+from app.core.settings import settings
 import grpc
 from app.protos import inference_pb2_grpc
 import logging
