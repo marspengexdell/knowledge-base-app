@@ -1,166 +1,117 @@
 import os
-import json
 import logging
-from threading import Lock, Thread
 from llama_cpp import Llama
-import time
+
+# 配置日志记录
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class RAGService:
-    def __init__(self, model_dir: str, default_model: str = None, embed_model_dir: str = None, db_path: str = None, active_models_path: str | None = None):
+    def __init__(self, model_dir, embed_model_dir, db_path):
+        """
+        初始化模型服务。
+        """
+        logging.info("--- RAGService 初始化开始 ---")
         self.model_dir = model_dir
         self.embed_model_dir = embed_model_dir
         self.db_path = db_path
-        self.lock = Lock()
-        self.model_loading = False
-        self.loading_model_name = None
-        self.current_generation_model = None
-        self.current_generation_model_name = ""
-        self.current_embedding_model = None
-        self.current_embedding_model_name = ""
-        self.available_models = {'generation': [], 'embedding': []}
-        # Path to the shared active models file. Defaults to the file mounted
-        # under ``/models`` so both the backend and inference services read
-        # and write the same configuration.
-        self.active_models_path = active_models_path or os.path.join("/models", "active_models.json")
-        self._active_models_mtime = 0.0
-        # 扫描模型目录
-        self._scan_models()
-        # 自动加载第一个可用的生成模型（后台加载）
-        if default_model and default_model in self.available_models['generation']:
-            Thread(target=self.load_model, args=(default_model, 'generation', True), daemon=True).start()
-        elif self.available_models['generation']:
-            first_model = self.available_models['generation'][0]
-            Thread(target=self.load_model, args=(first_model, 'generation', True), daemon=True).start()
+        
+        self.generation_model = None
+        self.embedding_model = None
+        
+        self.current_generation_model_name = None
+        self.current_embedding_model_name = None
 
-        # 自动加载第一个嵌入模型
-        if self.available_models['embedding']:
-            first_embed = self.available_models['embedding'][0]
-            Thread(target=self.load_model, args=(first_embed, 'embedding', True), daemon=True).start()
+        self.load_or_die()
+        logging.info("--- RAGService 初始化完成 ---")
 
-        # Load models defined in active_models.json if present
-        self.reload_if_needed()
+    def find_model_path(self, model_name, directory):
+        """在指定目录中查找模型文件的完整路径。"""
+        if not model_name:
+            return None
+        
+        path = os.path.join(directory, model_name)
+        if os.path.exists(path):
+            logging.info(f"成功找到模型文件: {path}")
+            return path
+        
+        logging.warning(f"模型文件未找到: {path}")
+        return None
 
-    def _scan_models(self):
-        self.available_models = {'generation': [], 'embedding': []}
-        if not os.path.exists(self.model_dir):
-            os.makedirs(self.model_dir)
-        # 扫描根目录下的模型文件
-        for filename in os.listdir(self.model_dir):
-            if filename.endswith('.gguf') or filename.endswith('.safetensors'):
-                lower = filename.lower()
-                if 'embed' in lower or 'embedding' in lower:
-                    self.available_models['embedding'].append(filename)
-                else:
-                    self.available_models['generation'].append(filename)
-        # 扫描嵌入模型子目录
-        embed_dir = os.path.join(self.model_dir, "embedding-model")
-        if os.path.isdir(embed_dir):
-            for sub in os.listdir(embed_dir):
-                if sub.endswith('.gguf') or sub.endswith('.safetensors'):
-                    self.available_models['embedding'].append(os.path.join("embedding-model", sub))
+    def load_generation_model(self):
+        """加载或重新加载生成模型，这是启用GPU的关键。"""
+        if not self.current_generation_model_name:
+            logging.error("没有设置当前的生成模型名称，无法加载。")
+            return
+
+        model_path = self.find_model_path(self.current_generation_model_name, self.model_dir)
+        if not model_path:
+            logging.error(f"无法加载生成模型，因为路径不存在: {self.current_generation_model_name}")
+            return
+
+        logging.info(f"开始从路径加载生成模型: {model_path}")
+        try:
+            self.generation_model = Llama(
+                model_path=model_path,
+                n_gpu_layers=-1,
+                n_ctx=4096,
+                verbose=True
+            )
+            logging.info(f"***** 已成功加载并启用GPU模型: {self.current_generation_model_name} *****")
+        except Exception as e:
+            logging.error(f"加载模型 {model_path} 时发生严重错误: {e}", exc_info=True)
+            self.generation_model = None
 
     def list_models(self):
-        # 返回可用模型列表及当前模型名
-        self._scan_models()
-        return {
-            'generation_models': self.available_models['generation'],
-            'embedding_models': self.available_models['embedding'],
-            'current_generation_model': self.current_generation_model_name,
-            'current_embedding_model': self.current_embedding_model_name,
-            'model_loading': self.model_loading,
-            'loading_model_name': self.loading_model_name,
-        }
-
-    def load_model(self, model_name: str, model_type: str = 'generation', async_mode: bool = False):
-        def _do_load():
-            with self.lock:
-                self.model_loading = True
-                self.loading_model_name = model_name
-            try:
-                model_path = os.path.join(self.model_dir, model_name)
-                logging.info(f"开始加载模型：{model_path}")
-                t0 = time.time()
-                model = Llama(model_path=model_path, n_ctx=2048, n_gpu_layers=-1)
-                with self.lock:
-                    if model_type == "generation":
-                        self.current_generation_model = model
-                        self.current_generation_model_name = model_name
-                    elif model_type == "embedding":
-                        self.current_embedding_model = model
-                        self.current_embedding_model_name = model_name
-                    logging.info(f"模型 {model_path} 加载完成, 耗时 {time.time() - t0:.2f} 秒")
-            except Exception as e:
-                logging.error(f"模型加载失败: {e}", exc_info=True)
-            finally:
-                with self.lock:
-                    self.model_loading = False
-                    self.loading_model_name = None
-
-        if async_mode:
-            Thread(target=_do_load, daemon=True).start()
-            return True
-        else:
-            _do_load()
-            return True
-
-    def generate_stream(self, prompt: str, model_name: str = None):
-        # 生成流式响应，如果模型正在加载则返回提示
-        with self.lock:
-            if self.model_loading:
-                yield "[ERROR] 模型正在加载中，请稍候"
-                return
-            model = self.current_generation_model
-            current_name = self.current_generation_model_name
-        if not model:
-            yield "[ERROR] 当前未加载生成模型"
-            return
+        """列出模型目录中所有可用的 GGUF 模型文件。"""
+        logging.info(f"正在扫描模型目录: {self.model_dir}")
+        generation_models = []
+        embedding_models = []
+        
         try:
-            # 使用 llama_cpp 模型生成文本
-            for chunk in model(prompt=prompt, stream=True, max_tokens=512):
-                txt = chunk['choices'][0]['text']
-                if txt:
-                    yield txt
+            if not os.path.exists(self.model_dir):
+                 logging.error(f"模型目录不存在: {self.model_dir}")
+                 return {}, {}
+            
+            for filename in os.listdir(self.model_dir):
+                if filename.lower().endswith(".gguf"):
+                    generation_models.append(filename)
+            logging.info(f"找到 {len(generation_models)} 个生成模型: {generation_models}")
+            
         except Exception as e:
-            logging.error(f"推理异常: {e}", exc_info=True)
-            yield f"[ERROR] 推理异常: {e}"
+            logging.error(f"扫描模型目录时出错: {e}", exc_info=True)
 
-    def switch_model(self, model_name: str, model_type: str = 'generation'):
-        # 异步后台加载模型
-        return self.load_model(model_name, model_type, async_mode=True)
+        return generation_models, embedding_models
 
-    def model_status(self):
-        with self.lock:
-            return {
-                "model_loading": self.model_loading,
-                "loading_model_name": self.loading_model_name,
-                "current_generation_model": self.current_generation_model_name,
-                "current_embedding_model": self.current_embedding_model_name,
-            }
-
-    def query(self, prompt: str, topk: int = 3):
-        # 检索模块暂时未实现，返回空列表
-        return []
-
-    def reload_if_needed(self):
-        """Reload models if ``active_models.json`` was modified."""
-        if not os.path.exists(self.active_models_path):
+    def load_or_die(self):
+        """
+        执行服务启动时的模型发现和加载流程。
+        """
+        gen_models, _ = self.list_models()
+        if not gen_models:
+            logging.error("错误：在 /models 目录中没有找到任何 .gguf 模型文件。服务无法启动。")
+            # 在实际生产中，这里可以直接 raise Exception("No models found") 来中断启动
             return
+            
+        self.current_generation_model_name = gen_models[0]
+        logging.info(f"默认选择加载模型: {self.current_generation_model_name}")
+        self.load_generation_model()
+
+    def generate_stream(self, prompt):
+        """使用加载的模型生成文本流。"""
+        if not self.generation_model:
+            logging.error("生成请求失败，因为模型未成功加载。")
+            yield "模型未加载，请检查服务端日志。"
+            return
+        # ... (其余代码不变)
         try:
-            mtime = os.path.getmtime(self.active_models_path)
-            if mtime <= self._active_models_mtime:
-                return
-            self._active_models_mtime = mtime
-            with open(self.active_models_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            stream = self.generation_model.create_chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                stream=True
+            )
+            for output in stream:
+                token = output["choices"][0]["delta"].get("content")
+                if token:
+                    yield token
         except Exception as e:
-            logging.error(f"Failed to read active models: {e}")
-            return
-
-        gen = data.get("generation")
-        if gen and gen != self.current_generation_model_name:
-            self.load_model(gen, "generation", async_mode=False)
-
-        embed = data.get("embedding")
-        if embed and embed != self.current_embedding_model_name:
-            self.load_model(embed, "embedding", async_mode=False)
-
+            logging.error(f"文本生成时出错: {e}", exc_info=True)
+            yield f"文本生成时遇到错误: {e}"
