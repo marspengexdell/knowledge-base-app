@@ -1,1 +1,4 @@
-{"generation": "Meta-Llama-3-8B.Q8_0.gguf", "embedding": ""}
+{
+  "generation": "Meta-Llama-3-8B.Q8_0.gguf",
+  "embedding": "embedding-model/bge-base-zh/model.safetensors"
+}

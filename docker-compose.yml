@@ -9,7 +9,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/app:/app/app
-      - ./models/active_models.json:/models/active_models.json
+      - ./models:/models           # <--- 挂载整个模型目录！千万别只挂单个文件
     environment:
       - GRPC_SERVER=inference:50051
       - VECTOR_DB_HOST=vector-db
@@ -60,12 +60,10 @@ services:
       - app-network
 
   vector-db:
-    image: ghcr.io/chroma-core/chroma:latest # 使用您 GitHub 中指定的镜像
+    image: ghcr.io/chroma-core/chroma:latest
     ports:
       - "8001:8000"
     volumes:
-      # --- 这是关键修正 ---
-      # 将数据卷挂载到容器的 /data 目录，与日志中显示的路径一致
       - chroma-data:/data
     networks:
       - app-network
