@@ -2,7 +2,6 @@ import grpc
 import json
 from concurrent import futures
 from llama_cpp import Llama
-# --- 关键修正：确保能正确找到 protos ---
 import protos.inference_pb2 as inference_pb2
 import protos.inference_pb2_grpc as inference_pb2_grpc
 import os
@@ -10,15 +9,12 @@ import logging
 import threading
 import time
 
-# --- 配置日志 ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- 全局常量 ---
 MODELS_PATH = "/models/"
 CONFIG_PATH = "/app/model_config.json"
 
-# --- 全局模型管理器 (线程安全的单例模式) ---
 class ModelManager:
     _instance = None
     _lock = threading.Lock()
@@ -27,7 +23,6 @@ class ModelManager:
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super(ModelManager, cls).__new__(cls)
-                # 使用一个标志来确保 __init__ 只执行一次
                 cls._instance.initialized = False
         return cls._instance
 
@@ -37,7 +32,7 @@ class ModelManager:
         self.model = None
         self.model_name = ""
         self.model_config = self._load_model_config()
-        self.lock = threading.Lock() # 用于模型切换操作的锁
+        self.lock = threading.Lock()
         self.initialized = True
         logger.info("模型管理器初始化完成。")
 
@@ -53,7 +48,6 @@ class ModelManager:
 
     def _get_chat_format(self, model_path):
         try:
-            # 仅加载元数据以获取架构信息，避免完整加载模型，不使用 GPU
             temp_llama = Llama(model_path=model_path, n_ctx=512, n_gpu_layers=0, verbose=False)
             metadata = temp_llama.metadata
             architecture = metadata.get('general.architecture')
@@ -91,7 +85,7 @@ class ModelManager:
                     logger.info(f"开始卸载旧模型: {self.model_name}...")
                     del self.model
                     self.model = None
-                
+
                 logger.info(f"正在为新模型 '{new_model_name}' 确定聊天格式...")
                 chat_format = self._get_chat_format(model_path)
 
@@ -99,14 +93,13 @@ class ModelManager:
                 self.model = Llama(
                     model_path=model_path,
                     n_ctx=4096,
-                    n_gpu_layers=-1, # -1 代表尽可能使用 GPU
+                    n_gpu_layers=-1,
                     chat_format=chat_format,
                     verbose=True
                 )
                 self.model_name = new_model_name
                 logger.info(f"***** 成功加载并启用GPU模型: {new_model_name} *****")
                 return {"status": "switched", "name": new_model_name}
-
             except Exception as e:
                 logger.error(f"切换模型时发生严重错误: {e}", exc_info=True)
                 self.model = None
@@ -144,17 +137,21 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
         model_name = request.model_name
         logger.info(f"gRPC SwitchModel 请求: {model_name}")
         result = model_manager.switch_model(model_name)
-        return inference_pb2.SwitchModelResponse(status=result.get("status", "error"), message=result.get("message", model_name))
+        # status 要用 bool success，切记！
+        success = result.get("status") in ("switched", "already_loaded")
+        message = result.get("message", model_name)
+        return inference_pb2.SwitchModelResponse(success=success, message=message)
 
-    def Chat(self, request_iterator, context):
+    # 方法名必须和 proto 一致
+    def ChatStream(self, request, context):
         model = model_manager.get_model_instance()
         if model is None:
-            logger.warning("Chat 请求失败，因为没有模型被加载。")
+            logger.warning("ChatStream 请求失败，因为没有模型被加载。")
             yield inference_pb2.ChatResponse(error_message="[SYSTEM-ERROR] No model loaded. Please select a model first.")
             return
 
-        messages = [{"role": req.role, "content": req.content} for req in request_iterator]
-
+        # 只处理单轮 query，后续多轮再升级
+        messages = [{"role": "user", "content": request.query}]
         try:
             stream = model.create_chat_completion(messages=messages, stream=True)
             for output in stream:
@@ -181,11 +178,11 @@ def serve():
             logger.warning(f"在 {MODELS_PATH} 目录下未找到任何 .gguf 模型文件。")
     except FileNotFoundError:
         logger.error(f"模型目录 {MODELS_PATH} 不存在，无法自动加载默认模型。")
-    
+
     logger.info("--- 服务已就绪，等待请求 ---")
     try:
         while True:
-            time.sleep(86400) # 保持主线程存活
+            time.sleep(86400)
     except KeyboardInterrupt:
         logger.info("服务关闭。")
         server.stop(0)
