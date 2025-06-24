@@ -28,7 +28,7 @@ RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https:/
 ENV CMAKE_ARGS="-DGGML_CUDA=on"
 ENV FORCE_CUDA="1"
 # Note: We only force compilation for this specific package
-RUN pip3 install --no-cache-dir --force-reinstall --no-binary llama-cpp-python "llama-cpp-python[cuda]"
+RUN pip3 install --no-cache-dir --force-reinstall llama-cpp-python
 
 # --- 4. Install Remaining Python Dependencies ---
 # Set the working directory
