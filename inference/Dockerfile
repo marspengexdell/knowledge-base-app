@@ -37,7 +37,7 @@ COPY requirements.txt /app/requirements.txt
 
 # Set environment variables to force llama-cpp-python to compile with CUDA support.
 # This needs to be set before installing the requirements.
-ENV CMAKE_ARGS="-DLLAMA_CUBLAS=on"
+ENV CMAKE_ARGS="-DGGML_CUDA=on"
 ENV FORCE_CUDA="1"
 
 # Install all other dependencies from requirements.txt.
