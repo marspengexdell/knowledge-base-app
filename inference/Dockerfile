@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     git \
     cmake \
+    ninja-build \
     pkg-config \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3 /usr/bin/python
