@@ -24,9 +24,11 @@ RUN echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/cuda.conf && ldconfig
 ENV PATH="/usr/local/cuda/bin:${PATH}"
 
 # --- 3. Install PyTorch with CUDA Support ---
-# This is the most reliable way to install PyTorch with GPU support.
-# It fetches pre-compiled wheels for CUDA 12.1.
-RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Pre-download the required wheels and copy them into the image. This avoids
+# reaching out to the remote index during the build which is useful for
+# offline or reproducible setups.
+COPY pytorch-wheels /tmp/pytorch-wheels
+RUN pip3 install --no-cache-dir /tmp/pytorch-wheels/*.whl
 
 # --- 4. Install Remaining Python Dependencies (Including llama-cpp-python) ---
 # Set the working directory
