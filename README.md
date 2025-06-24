@@ -93,6 +93,15 @@ docker compose up
 ```
 
 Rebuilding guarantees the containers use the updated packages.
+
+### Updating PyTorch Wheels
+
+The inference image installs PyTorch from local wheel files found in
+`inference/pytorch-wheels/`. These wheels are not committed to the repository.
+When upgrading PyTorch, manually download the CUDA 12.1 builds of
+`torch`, `torchvision` and `torchaudio` from the official
+[PyTorch wheel index](https://download.pytorch.org/whl/cu121) and place them in
+that directory before rebuilding the containers.
 ### Regenerating gRPC Stubs
 
 If you modify `inference.proto`, regenerate the Python stubs so that both the
