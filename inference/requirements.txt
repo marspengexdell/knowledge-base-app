@@ -6,5 +6,5 @@ transformers
 fastapi==0.110.0
 uvicorn==0.27.1
 llama-cpp-python>=0.2.74
-faiss-gpu
-sentence-transformers
+faiss-gpu==1.7.2
+sentence-transformers==2.6.1
