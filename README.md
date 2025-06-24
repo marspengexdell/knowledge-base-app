@@ -121,3 +121,10 @@ python -m grpc_tools.protoc -I inference/app/protos \
 Docker automatically performs this step during image builds, but keeping the
 generated files committed avoids mismatches between local sources and what the
 containers see at build time.
+
+After editing `inference.proto` or code under `inference/app`, rebuild the `inference` service and restart the containers:
+
+```bash
+docker compose build inference    # add --no-cache if necessary
+docker compose up -d
+```
