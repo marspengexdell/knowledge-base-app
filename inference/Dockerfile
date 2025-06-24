@@ -5,7 +5,7 @@ FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # --- 1. Install System Dependencies and Build Tools ---
-# Update package lists and install a complete build toolchain, NOW INCLUDING NINJA
+# Update package lists and install a complete build toolchain
 RUN apt-get update && apt-get install -y \
     build-essential \
     python3.10 \
@@ -18,9 +18,9 @@ RUN apt-get update && apt-get install -y \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
 # --- 2. Configure Environment for CUDA ---
-# **THE FIX IS HERE**: Add CUDA library paths to the linker's search path.
-# This ensures that libraries like libcuda.so can be found during the build.
-ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+# **THE FIX IS HERE**: Make the CUDA libraries permanently available to the system linker.
+# This ensures that all subprocesses, including those for linking C++ code, can find libcuda.so.
+RUN echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/cuda.conf && ldconfig
 ENV PATH="/usr/local/cuda/bin:${PATH}"
 
 # --- 3. Install PyTorch with CUDA Support ---
@@ -35,10 +35,8 @@ WORKDIR /app
 # Copy the requirements file
 COPY requirements.txt /app/requirements.txt
 
-# Set environment variables to force llama-cpp-python to compile with CUDA support.
-# This needs to be set before installing the requirements.
-ENV CMAKE_ARGS="-DGGML_CUDA=on"
-ENV FORCE_CUDA="1"
+# Set the correct environment variable to force CUDA compilation for llama-cpp-python.
+ENV CMAKE_ARGS="-DGGML_CUDA=ON"
 
 # Install all other dependencies from requirements.txt.
 # Pip will automatically build llama-cpp-python from source using the environment variables above.
