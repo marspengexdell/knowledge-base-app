@@ -1,15 +1,11 @@
-# inference/Dockerfile (最终的、包含完整编译工具链的修正版)
-
+# Base image with CUDA 12.1.1 and cuDNN 8 development tools
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
-# 设置环境变量，避免在安装过程中出现交互式提示
+# Set environment variables to non-interactive to avoid prompts during installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 设置工作目录
-WORKDIR /app
-
-# --- 关键修正：安装所有可能的编译依赖 ---
-# 更新系统包并安装一个完整的编译工具链
+# --- 1. Install System Dependencies and Build Tools ---
+# Update package lists and install a complete build toolchain
 RUN apt-get update && apt-get install -y \
     build-essential \
     python3.10 \
@@ -17,35 +13,44 @@ RUN apt-get update && apt-get install -y \
     git \
     cmake \
     pkg-config \
-    autoconf \
-    automake \
-    libtool \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
-# --- 关键修正：强制编译 CUDA ---
-# 设置环境变量，强制 llama-cpp-python 在安装时编译 CUDA 支持
+# --- 2. Install PyTorch with CUDA Support ---
+# This is the most reliable way to install PyTorch with GPU support.
+# It fetches pre-compiled wheels for CUDA 12.1, avoiding a lengthy and error-prone source build.
+RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# --- 3. Install llama-cpp-python with Forced CUDA Compilation ---
+# Set environment variables to force llama-cpp-python to compile with CUDA support.
+# We install it separately and use --no-binary to ensure it's built from source using these flags.
 ENV CMAKE_ARGS="-DLLAMA_CUBLAS=on"
 ENV FORCE_CUDA="1"
+# Note: We only force compilation for this specific package
+RUN pip3 install --no-cache-dir --force-reinstall --no-binary llama-cpp-python "llama-cpp-python[cuda]"
 
-# 复制并安装 Python 依赖
-# (路径相对于 inference 目录)
+# --- 4. Install Remaining Python Dependencies ---
+# Set the working directory
+WORKDIR /app
+# Copy the requirements file
 COPY requirements.txt /app/requirements.txt
-RUN pip3 install --no-cache-dir --upgrade pip && \
-    # --force-reinstall 确保即使有缓存也重新安装
-    # --no-binary :all: 强制从源码编译以应用我们的环境变量
-    pip3 install --no-cache-dir --force-reinstall --no-binary :all: -r requirements.txt
+# Install the rest of the dependencies from requirements.txt.
+# This will use pre-compiled wheels where available, which is much faster.
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# 复制整个 app 目录到容器的 /app
-# (路径相对于 inference 目录)
+# --- 5. Copy Application Code and Generate gRPC files ---
+# Copy the entire app directory into the container's /app
+# (This path is relative to the Dockerfile's location, i.e., inside the 'inference' directory)
 COPY app /app
 
-# 生成 gRPC 代码
+# Generate gRPC code from .proto file
+# Ensure the 'protos' directory exists in the build context.
 RUN python3 -m grpc_tools.protoc \
-    -I=protos \
+    -I=. \
     --python_out=. \
     --grpc_python_out=. \
     protos/inference.proto
 
-# 容器启动时运行的命令
-CMD ["python", "main.py"]
+# --- 6. Set Container Entrypoint ---
+# The command to run when the container starts.
+CMD ["python", "app/main.py"]
