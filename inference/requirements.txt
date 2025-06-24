@@ -5,6 +5,6 @@ protobuf>=6.31.0
 transformers
 fastapi==0.110.0
 uvicorn==0.27.1
-llama-cpp-python>=0.2.74
+llama-cpp-python==0.2.74
 faiss-gpu
 sentence-transformers
