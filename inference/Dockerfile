@@ -25,7 +25,7 @@ RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https:/
 # --- 3. Install llama-cpp-python with Forced CUDA Compilation ---
 # Set environment variables to force llama-cpp-python to compile with CUDA support.
 # We install it separately and use --no-binary to ensure it's built from source using these flags.
-ENV CMAKE_ARGS="-DLLAMA_CUBLAS=on"
+ENV CMAKE_ARGS="-DGGML_CUDA=on"
 ENV FORCE_CUDA="1"
 # Note: We only force compilation for this specific package
 RUN pip3 install --no-cache-dir --force-reinstall --no-binary llama-cpp-python "llama-cpp-python[cuda]"
