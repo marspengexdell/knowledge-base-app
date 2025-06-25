@@ -1,7 +1,4 @@
-# docker-compose.yml (最终修正版)
-
 services:
-  # 后端服务
   backend:
     build:
       context: ./backend
@@ -11,8 +8,6 @@ services:
     volumes:
       - ./backend/app:/app/app
     environment:
-      # --- 这是唯一的、最关键的修正 ---
-      # 将环境变量名从 GRPC_SERVER 改为 GRPC_SERVER_ADDRESS
       - GRPC_SERVER_ADDRESS=inference:50051
       - VECTOR_DB_HOST=vector-db
       - VECTOR_DB_PORT=8000
@@ -22,7 +17,6 @@ services:
     networks:
       - app-network
 
-  # 用户前端服务
   frontend-user:
     build:
       context: ./frontend-user
@@ -34,7 +28,6 @@ services:
     networks:
       - app-network
 
-  # 管理后台前端服务
   frontend-admin:
     build:
       context: ./frontend-admin
@@ -46,7 +39,6 @@ services:
     networks:
       - app-network
 
-  # 推理服务
   inference:
     build:
       context: ./inference
@@ -54,15 +46,14 @@ services:
     volumes:
       - ./models:/models:rw
       - ./inference/app/model_config.json:/app/model_config.json:ro
-    # 您的 GPU 配置方式（完全有效，予以保留）
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
+      - LLAMA_CUBLAS=1       # ★★关键修正，强制cuBLAS，GPU推理
     gpus: all
     networks:
       - app-network
 
-  # 向量数据库服务
   vector-db:
     image: ghcr.io/chroma-core/chroma:latest
     ports:
