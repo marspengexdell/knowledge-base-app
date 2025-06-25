@@ -9,6 +9,7 @@ import os
 import logging
 import threading
 import time
+from utils import IS_GPU_AVAILABLE
 from enum import Enum
 
 # --- 核心修改 1: 使用更清晰的日志格式 ---
@@ -106,11 +107,15 @@ class ModelManager:
 
             logger.info(f"开始在后台加载新模型: {new_model_name} (模板: '{chat_format}')...")
             logger.info("这是一个耗时操作，可能需要几分钟。请观察下方来自 llama.cpp 的详细日志。")
-            
+
+            n_gpu_layers = -1 if IS_GPU_AVAILABLE else 0
+            device = "GPU" if IS_GPU_AVAILABLE else "CPU"
+            logger.info(f"将使用 {device} 加载模型 (n_gpu_layers={n_gpu_layers}).")
+
             new_model = Llama(
                 model_path=model_path,
                 n_ctx=4096,
-                n_gpu_layers=-1,
+                n_gpu_layers=n_gpu_layers,
                 chat_format=chat_format,
                 verbose=True
             )
@@ -118,8 +123,11 @@ class ModelManager:
             with self.lock:
                 self.model = new_model
                 self.status = ModelStatus.READY
-                logger.info(f"***** 成功加载并启用GPU模型: {new_model_name} *****")
-                logger.info("请在日志中回溯查找 'offloaded ... layers to GPU' 和 'CUDA' 相关字样，以确认GPU加速已启用。")
+                if IS_GPU_AVAILABLE:
+                    logger.info(f"***** 成功加载并启用GPU模型: {new_model_name} *****")
+                    logger.info("请在日志中回溯查找 'offloaded ... layers to GPU' 和 'CUDA' 相关字样，以确认GPU加速已启用。")
+                else:
+                    logger.info(f"***** 成功加载并启用CPU模型: {new_model_name} *****")
 
         except Exception as e:
             logger.error(f"后台切换模型时发生严重错误: {e}", exc_info=True)
@@ -160,7 +168,8 @@ class ModelManager:
             return {
                 "model_name": self.model_name,
                 "status": self.status.value,
-                "error_message": self.error_message
+                "error_message": self.error_message,
+                "device": "GPU" if IS_GPU_AVAILABLE else "CPU"
             }
 
     def get_model_instance(self):
