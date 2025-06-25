@@ -77,7 +77,8 @@ class GrpcClientManager:
             "generation_models": list(response.generation_models),
             "embedding_models": list(response.embedding_models),
             "current_generation_model": response.current_generation_model,
-            "current_embedding_model": response.current_embedding_model
+            "current_embedding_model": response.current_embedding_model,
+            "device": getattr(response, "device", "")
         }
 
     async def switch_model(self, model_name: str, model_type: str = "generation"):
