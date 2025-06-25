@@ -4,6 +4,7 @@ from concurrent import futures
 from llama_cpp import Llama
 import protos.inference_pb2 as inference_pb2
 import protos.inference_pb2_grpc as inference_pb2_grpc
+from grpc_reflection.v1alpha import reflection   # ★ 关键：gRPC 反射
 import os
 import logging
 import threading
@@ -137,12 +138,11 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
         model_name = request.model_name
         logger.info(f"gRPC SwitchModel 请求: {model_name}")
         result = model_manager.switch_model(model_name)
-        # status 要用 bool success，切记！
+        # proto: bool success
         success = result.get("status") in ("switched", "already_loaded")
         message = result.get("message", model_name)
         return inference_pb2.SwitchModelResponse(success=success, message=message)
 
-    # 方法名必须和 proto 一致
     def ChatStream(self, request, context):
         model = model_manager.get_model_instance()
         if model is None:
@@ -150,7 +150,6 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
             yield inference_pb2.ChatResponse(error_message="[SYSTEM-ERROR] No model loaded. Please select a model first.")
             return
 
-        # 只处理单轮 query，后续多轮再升级
         messages = [{"role": "user", "content": request.query}]
         try:
             stream = model.create_chat_completion(messages=messages, stream=True)
@@ -165,6 +164,14 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     inference_pb2_grpc.add_InferenceServiceServicer_to_server(InferenceService(), server)
+
+    # ★ 添加 reflection 支持，便于 grpcurl/外部调试
+    SERVICE_NAMES = (
+        inference_pb2.DESCRIPTOR.services_by_name['InferenceService'].full_name,
+        reflection.SERVICE_NAME,
+    )
+    reflection.enable_server_reflection(SERVICE_NAMES, server)
+
     server.add_insecure_port('[::]:50051')
     server.start()
     logger.info("***** gRPC 服务器已成功启动，正在监听端口 50051 *****")
