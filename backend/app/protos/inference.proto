@@ -29,6 +29,7 @@ message ModelListResponse {
     repeated string embedding_models = 2;
     string current_generation_model = 3;
     string current_embedding_model = 4;
+    string device = 5;
 }
 
 message SwitchModelRequest {

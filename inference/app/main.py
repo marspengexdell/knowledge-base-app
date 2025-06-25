@@ -157,10 +157,12 @@ class ModelManager:
 
     def get_current_status(self):
         with self.lock:
+            device = "cuda" if os.path.exists("/dev/nvidia0") else "cpu"
             return {
                 "model_name": self.model_name,
                 "status": self.status.value,
-                "error_message": self.error_message
+                "error_message": self.error_message,
+                "device": device,
             }
 
     def get_model_instance(self):
@@ -200,6 +202,7 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
             embedding_models=[],
             current_generation_model=current_generation_model,
             current_embedding_model="",
+            device=status_info.get("device", ""),
         )
 
     def SwitchModel(self, request, context):

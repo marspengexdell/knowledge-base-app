@@ -36,22 +36,36 @@ async def switch_model(request: ModelSwitchRequest):
 @router.get("/models")
 async def get_models():
     try:
-        models = list_available_models()
+        await grpc_client_manager.connect()
+        models = await grpc_client_manager.list_models()
         return models
     except Exception as e:
-        return {
-            "generation_models": [],
-            "embedding_models": [],
-            "current_generation_model": "",
-            "current_embedding_model": "",
-            "error": str(e),
-        }
+        try:
+            # fallback to local listing without device info
+            models = list_available_models()
+            models["device"] = ""
+            return models
+        except Exception:
+            return {
+                "generation_models": [],
+                "embedding_models": [],
+                "current_generation_model": "",
+                "current_embedding_model": "",
+                "device": "",
+                "error": str(e),
+            }
 
 @router.get("/models/status")
 async def get_model_status():
     # 与 /models 接口返回内容相同
     try:
-        models = list_available_models()
+        await grpc_client_manager.connect()
+        models = await grpc_client_manager.list_models()
         return models
     except Exception as e:
-        return {"error": str(e)}
+        try:
+            models = list_available_models()
+            models["device"] = ""
+            return models
+        except Exception:
+            return {"error": str(e)}
