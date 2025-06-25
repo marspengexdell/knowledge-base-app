@@ -21,6 +21,9 @@
           </el-tag>
           <span v-else>未加载</span>
         </el-descriptions-item>
+        <el-descriptions-item label="设备">
+          <el-tag>{{ modelsInfo.device || '未知' }}</el-tag>
+        </el-descriptions-item>
       </el-descriptions>
 
       <!-- Upload Models -->
@@ -106,7 +109,8 @@ const modelsInfo = ref({
   generation_models: [],
   embedding_models: [],
   current_generation_model: '',
-  current_embedding_model: ''
+  current_embedding_model: '',
+  device: ''
 });
 
 const selection = reactive({
