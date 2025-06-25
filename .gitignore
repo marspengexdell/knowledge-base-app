@@ -37,3 +37,14 @@ docker-compose.override.yml
 __pycache__/
 *.pyc
 
+# Ignore zero-length placeholder files
+CACHED
+\[backend
+\[backend\]
+\[frontend-admin
+\[frontend-admin\]
+\[frontend-user
+\[frontend-user\]
+\[inference
+\[inference\]
+docker
