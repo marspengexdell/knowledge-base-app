@@ -2,6 +2,7 @@ import os
 import logging
 from llama_cpp import Llama
 from sentence_transformers import SentenceTransformer
+from .utils import get_chat_format   # 新增
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -26,7 +27,6 @@ class RAGService:
         path = os.path.join(directory, model_name)
         if os.path.exists(path):
             return path
-        # 兼容相对子目录
         if os.path.exists(model_name):
             return model_name
         return None
@@ -42,13 +42,16 @@ class RAGService:
             logging.error(f"生成模型文件不存在: {self.current_generation_model_name}")
             return
         try:
+            # 自动检测并适配 chat_format
+            chat_format = get_chat_format(model_path)
             self.generation_model = Llama(
                 model_path=model_path,
                 n_gpu_layers=-1,
                 n_ctx=4096,
+                chat_format=chat_format,
                 verbose=True
             )
-            logging.info(f"成功加载生成模型: {model_path}")
+            logging.info(f"成功加载生成模型: {model_path} (chat_format={chat_format})")
         except Exception as e:
             logging.error(f"加载生成模型失败: {e}")
 
@@ -150,4 +153,4 @@ class RAGService:
             # 假如以后用 llama.cpp 做 embedding
             return self.embedding_model.create_embedding(text)
         else:
-            raise Exception("未知的嵌入模型类型")
+            raise Except
