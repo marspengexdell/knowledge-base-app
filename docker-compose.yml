@@ -12,8 +12,10 @@ services:
       - VECTOR_DB_HOST=vector-db
       - VECTOR_DB_PORT=8000
     depends_on:
-      - inference
-      - vector-db
+      inference:
+        condition: service_healthy # ★ 新增：等待 inference 服务健康检查通过后再启动
+      vector-db:
+        condition: service_started
     networks:
       - app-network
 
@@ -49,8 +51,23 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
-      - LLAMA_CUBLAS=1       # ★★关键修正，强制cuBLAS，GPU推理
+      - LLAMA_CUBLAS=1
+    # ★ 按要求添加：旧版 gpus 语法
     gpus: all
+    # ★ 按要求添加：新版 deploy 语法 (推荐)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    shm_size: '2gb'
+    healthcheck:
+      test: ["CMD", "nvidia-smi"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
     networks:
       - app-network
 
