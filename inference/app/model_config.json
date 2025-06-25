@@ -1,6 +1,6 @@
 {
   "model_chat_formats": {
-    "llama": "llama-2",     
+    "llama": "chatml",     
     "llama-3": "chatml",        
     "qwen": "chatml",
     "qwen2": "chatml",
