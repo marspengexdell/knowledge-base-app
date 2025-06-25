@@ -5,7 +5,7 @@ protobuf>=6.31.0
 transformers
 fastapi==0.110.0
 uvicorn==0.27.1
-llama-cpp-python>=0.2.74
 faiss-gpu==1.7.2
 sentence-transformers==2.6.1
 grpcio-reflection
+# llama-cpp-python 这一行删掉！
