@@ -1,1 +1,4 @@
-{"generation": "Qwen-7B-Chat.Q4_K_M.gguf"}
+{
+  "generation": "Qwen-7B-Chat.Q4_K_M.gguf",
+  "embedding": "bge-base-zh"
+}
