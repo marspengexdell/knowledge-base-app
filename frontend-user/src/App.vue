@@ -8,7 +8,6 @@
       </div>
     </div>
 
-    <!-- Chat Message Display Area -->
     <div id="chat-window" ref="chatWindow">
       <div v-for="message in messages" :key="message.id" :class="['message-row', message.role]">
         <div class="message-bubble">
@@ -17,7 +16,6 @@
       </div>
     </div>
 
-    <!-- Input Area -->
     <div id="chat-input-area">
       <textarea
         v-model="userInput"
@@ -44,13 +42,12 @@ const messages = ref([
 const userInput = ref('');
 const isConnected = ref(false);
 const isGenerating = ref(false);
-const chatWindow = ref(null); // Ref for the chat window DOM element
+const chatWindow = ref(null);
 let socket = null;
 
 // --- WebSocket Logic ---
 const connectWebSocket = () => {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  // In production, this would point to the same host. For dev, Vite proxy handles it.
   const wsURL = `${wsProtocol}//${window.location.host}/api/chat/ws`;
   
   socket = new WebSocket(wsURL);
@@ -61,15 +58,22 @@ const connectWebSocket = () => {
   };
 
   socket.onmessage = (event) => {
-    // Append the received token to the last assistant message
+    const receivedData = event.data;
+
+    // ★ 修正 1：优先处理 [DONE] 信号
+    if (receivedData === '[DONE]') {
+      isGenerating.value = false; // 只有在收到DONE时才表示生成完毕
+      return;
+    }
+
     const lastMessage = messages.value[messages.value.length - 1];
     if (lastMessage && lastMessage.role === 'assistant') {
-      if (isGenerating.value) {
-        // First token received, replace "Thinking..."
-        lastMessage.content = event.data;
-        isGenerating.value = false; // Allow user to send new message if they want
+      // ★ 修正 2：改进初次token的处理
+      // 如果内容还是占位符，就替换它；否则，追加。
+      if (lastMessage.content === '🤔 思考中...') {
+        lastMessage.content = receivedData;
       } else {
-        lastMessage.content += event.data;
+        lastMessage.content += receivedData;
       }
       scrollToBottom();
     }
@@ -83,7 +87,6 @@ const connectWebSocket = () => {
 
   socket.onerror = (error) => {
     console.error("WebSocket Error:", error);
-    isConnected.value = false;
     isGenerating.value = false;
     messages.value.push({
       id: uuidv4(),
@@ -95,21 +98,19 @@ const connectWebSocket = () => {
 
 // --- Message Handling ---
 const sendMessage = () => {
-  if (!userInput.value.trim() || !isConnected.value) return;
+  if (!userInput.value.trim() || !isConnected.value || isGenerating.value) return;
 
-  // 1. Add user message to the list
   messages.value.push({
     id: uuidv4(),
     role: 'user',
     content: userInput.value,
   });
 
-  // 2. Send message via WebSocket
   socket.send(userInput.value);
-  userInput.value = ''; // Clear input
-  isGenerating.value = true;
+  userInput.value = '';
+  isGenerating.value = true; // 开始生成
 
-  // 3. Add a placeholder for the AI's response
+  // 添加占位符
   messages.value.push({
     id: uuidv4(),
     role: 'assistant',
@@ -133,27 +134,18 @@ const scrollToBottom = () => {
 };
 
 const connectionStatus = computed(() => {
-  if (isConnected.value) {
-    return { text: '已连接', class: 'connected' };
-  }
-  return { text: '未连接', class: 'disconnected' };
+  return isConnected.value 
+    ? { text: '已连接', class: 'connected' }
+    : { text: '未连接', class: 'disconnected' };
 });
-
 
 // --- Lifecycle Hooks ---
-onMounted(() => {
-  connectWebSocket();
-});
-
-onUnmounted(() => {
-  if (socket) {
-    socket.close();
-  }
-});
+onMounted(() => connectWebSocket());
+onUnmounted(() => { if (socket) socket.close(); });
 </script>
 
 <style>
-/* Using global styles from style.css but adding component-specific styles here */
+/* 你的 CSS 样式保持不变 */
 #chat-container {
   display: flex;
   flex-direction: column;
@@ -163,7 +155,6 @@ onUnmounted(() => {
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
-
 .header {
   padding: 10px 20px;
   background-color: #333;
@@ -186,11 +177,9 @@ onUnmounted(() => {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  transition: background-color 0.3s;
 }
 .status-light.connected { background-color: #4caf50; }
 .status-light.disconnected { background-color: #f44336; }
-
 #chat-window {
   flex-grow: 1;
   overflow-y: auto;
@@ -199,7 +188,6 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 15px;
 }
-
 .message-row {
   display: flex;
 }
@@ -209,7 +197,6 @@ onUnmounted(() => {
 .message-row.assistant {
   justify-content: flex-start;
 }
-
 .message-bubble {
   max-width: 80%;
   padding: 10px 15px;
@@ -226,8 +213,6 @@ onUnmounted(() => {
   color: #f1f1f1;
   border-top-left-radius: 4px;
 }
-
-/* Markdown rendering styles */
 .content p:first-child { margin-top: 0; }
 .content p:last-child { margin-bottom: 0; }
 .content pre {
@@ -240,8 +225,6 @@ onUnmounted(() => {
 .content code {
   font-family: 'Courier New', Courier, monospace;
 }
-
-
 #chat-input-area {
   display: flex;
   padding: 15px;
