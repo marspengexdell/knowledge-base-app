@@ -1,128 +1,92 @@
+<template>
+  <div id="app-container">
+    <aside class="sidebar">
+      <div class="logo">
+        <h2>AI Admin</h2>
+      </div>
+      <nav class="navigation">
+        <router-link to="/knowledge-base" class="nav-item">知识库管理</router-link>
+        <router-link to="/model-management" class="nav-item">模型管理</router-link>
+      </nav>
+    </aside>
+    <main class="main-content">
+      <router-view />
+    </main>
+  </div>
+</template>
+
 <script setup>
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
-import { marked } from 'marked';
-import { v4 as uuidv4 } from 'uuid';
-
-// --- 响应式状态 ---
-const messages = ref([
-  { id: uuidv4(), role: 'assistant', content: '您好！我是您的AI知识库助手，有什么可以帮助您的吗？' }
-]);
-const userInput = ref('');
-const isConnected = ref(false);
-const isGenerating = ref(false);
-const chatWindow = ref(null);
-let socket = null;
-let isFirstToken = false;
-
-// --- WebSocket 逻辑 ---
-const connectWebSocket = () => {
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsURL = `${wsProtocol}//${window.location.host}/api/chat/ws`;
-  
-  socket = new WebSocket(wsURL);
-
-  socket.onopen = () => {
-    console.log("WebSocket 连接已建立。");
-    isConnected.value = true;
-  };
-
-  socket.onmessage = (event) => {
-    const receivedData = event.data;
-    const lastMessage = messages.value[messages.value.length - 1];
-
-    // 1. 优先处理流结束信号
-    if (receivedData === '[DONE]') {
-      if (isFirstToken && lastMessage && lastMessage.role === 'assistant') {
-        messages.value.pop();
-      }
-      isGenerating.value = false;
-      isFirstToken = false;
-      console.log("AI 回复流已结束。");
-      return;
-    }
-
-    // 2. 如果不是结束信号，且我们正期待回复，则处理为内容
-    // （极限情况防御：isGenerating.value || (lastMessage && lastMessage.role === 'assistant')）
-    if (isGenerating.value && lastMessage && lastMessage.role === 'assistant') {
-      if (isFirstToken) {
-        lastMessage.content = receivedData;
-        isFirstToken = false;
-      } else {
-        lastMessage.content += receivedData;
-      }
-      scrollToBottom();
-    }
-  };
-
-  socket.onclose = () => {
-    console.log("WebSocket 连接已关闭。");
-    isConnected.value = false;
-    isGenerating.value = false;
-  };
-
-  socket.onerror = (error) => {
-    console.error("WebSocket 错误:", error);
-    isConnected.value = false;
-    isGenerating.value = false;
-    messages.value.push({
-      id: uuidv4(),
-      role: 'assistant',
-      content: '抱歉，连接出现问题，请刷新页面重试。'
-    });
-  };
-};
-
-// --- 消息处理 ---
-const sendMessage = () => {
-  if (!userInput.value.trim() || !isConnected.value || isGenerating.value) return;
-
-  messages.value.push({
-    id: uuidv4(),
-    role: 'user',
-    content: userInput.value,
-  });
-
-  socket.send(userInput.value);
-  userInput.value = '';
-  
-  isGenerating.value = true;
-  isFirstToken = true;
-
-  messages.value.push({
-    id: uuidv4(),
-    role: 'assistant',
-    content: '🤔 思考中...',
-  });
-  
-  scrollToBottom();
-};
-
-const renderMarkdown = (content) => marked.parse(content);
-
-// --- UI 工具 ---
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (chatWindow.value) {
-      chatWindow.value.scrollTop = chatWindow.value.scrollHeight;
-    }
-  });
-};
-
-const connectionStatus = computed(() => {
-  if (isConnected.value) {
-    return { text: '已连接', class: 'connected' };
-  }
-  return { text: '未连接', class: 'disconnected' };
-});
-
-// --- 生命周期钩子 ---
-onMounted(() => {
-  connectWebSocket();
-});
-
-onUnmounted(() => {
-  if (socket) {
-    socket.close();
-  }
-});
+// 这个主 App.vue 组件只负责提供整体布局和导航。
 </script>
+
+<style>
+/* 重置和全局样式 */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #app {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: #f0f2f5;
+  color: #333;
+}
+
+#app-container {
+  display: flex;
+  height: 100%;
+}
+
+.sidebar {
+  width: 240px;
+  background-color: #2c3e50;
+  color: #ecf0f1;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+.logo {
+  padding: 24px 20px;
+  text-align: center;
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: #fff;
+  background-color: #3498db;
+}
+
+.navigation {
+  flex-grow: 1;
+  padding-top: 20px;
+}
+
+.nav-item {
+  display: block;
+  padding: 16px 24px;
+  color: #ecf0f1;
+  text-decoration: none;
+  transition: background-color 0.2s, border-left-color 0.2s;
+  border-left: 4px solid transparent;
+  font-size: 1rem;
+}
+
+.nav-item:hover {
+  background-color: #34495e;
+}
+
+/* 当链接被激活时（即当前页面），显示高亮效果 */
+.router-link-active, .router-link-exact-active {
+  background-color: #34495e;
+  border-left-color: #3498db;
+  font-weight: 600;
+}
+
+.main-content {
+  flex-grow: 1;
+  padding: 30px;
+  overflow-y: auto;
+}
+</style>
