@@ -1,12 +1,11 @@
-# backend/app/services/knowledge_base.py
-
 import os
 import shutil
 from typing import List, Optional
+from .embedding import embedding_model  # 新增
 
 class KnowledgeBaseService:
     """
-    简易本地知识库维护服务：支持文档上传、删除、列表、获取内容。
+    简易本地知识库维护服务：支持文档上传、删除、列表、获取内容、转向量。
     支持未来与RAG/embedding联动。
     """
 
@@ -50,13 +49,16 @@ class KnowledgeBaseService:
         os.makedirs(self.storage_dir, exist_ok=True)
         return True
 
-# 单例对象，便于 import 复用
-kb_service = KnowledgeBaseService()
+    # 新增：将指定文档转为embedding向量
+    def embed_document(self, file_name: str):
+        content_bytes = self.get_document(file_name)
+        if content_bytes is None:
+            return None
+        try:
+            text = content_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            text = content_bytes.decode("gbk", errors="ignore")
+        embedding = embedding_model.embed(text)
+        return embedding
 
-# FastAPI 路由建议（可选）
-# from fastapi import APIRouter, File, UploadFile
-# router = APIRouter()
-# @router.post("/upload")
-# async def upload_doc(file: UploadFile = File(...)):
-#     kb_service.add_document(file.filename, await file.read())
-#     return {"success": True}
+kb_service = KnowledgeBaseService()

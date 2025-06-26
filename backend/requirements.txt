@@ -10,4 +10,6 @@ websockets==12.0
 pydantic-settings==2.1.0
 python-multipart==0.0.9
 protobuf>=6.31.0
-
+sentence-transformers>=2.3.0
+torch>=1.10.0
+numpy
