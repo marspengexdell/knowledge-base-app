@@ -1,5 +1,4 @@
 import grpc
-import json
 from concurrent import futures
 from llama_cpp import Llama
 import protos.inference_pb2 as inference_pb2
@@ -10,7 +9,6 @@ import logging
 import threading
 import time
 from utils import IS_GPU_AVAILABLE
-from services.utils import get_chat_handler  # ★确保这里是实际文件结构
 from enum import Enum
 
 logging.basicConfig(
@@ -43,7 +41,6 @@ class ModelManager:
             return
         self.model = None
         self.model_name = ""
-        self.chat_handler = None
         self.status = ModelStatus.IDLE
         self.error_message = ""
         self.lock = threading.Lock()
@@ -57,34 +54,34 @@ class ModelManager:
                     logger.info(f"开始卸载旧模型: {self.model_name}...")
                     del self.model
                     self.model = None
-                self.chat_handler = None
                 self.model_name = new_model_name
                 self.status = ModelStatus.LOADING
                 self.error_message = ""
 
-            model_path = os.path.join(MODELS_PATH, new_model_name)
             logger.info(f"开始在后台加载新模型: {new_model_name}...")
+            logger.info("这是一个耗时操作，可能需要几分钟。")
 
+            model_path = os.path.join(MODELS_PATH, new_model_name)
             n_gpu_layers = -1 if IS_GPU_AVAILABLE else 0
             device = "GPU" if IS_GPU_AVAILABLE else "CPU"
             logger.info(f"将使用 {device} 加载模型 (n_gpu_layers={n_gpu_layers}).")
+            logger.info("chat_format将由llama-cpp-python自动检测，不再依赖手工配置。")
 
+            # 只用 Llama 自动模板，无 chat_format 参数
             new_model = Llama(
                 model_path=model_path,
                 n_ctx=4096,
                 n_gpu_layers=n_gpu_layers,
                 verbose=True
             )
-            chat_handler = get_chat_handler(model_path)
 
             with self.lock:
                 self.model = new_model
-                self.chat_handler = chat_handler
                 self.status = ModelStatus.READY
-                if not self.chat_handler:
-                    logger.warning(f"模型 '{new_model_name}' 已加载，但未能获取聊天模板，将作为基础模型使用。")
-                else:
-                    logger.info(f"模型 '{new_model_name}' 已加载，并成功设置了聊天处理器。")
+                detected_format = getattr(new_model, 'chat_format', '未知')
+                logger.info(f"***** 成功加载模型: {new_model_name} *****")
+                logger.info(f"***** 自动检测到的聊天模板格式: {detected_format} *****")
+
         except Exception as e:
             logger.error(f"后台切换模型时发生严重错误: {e}", exc_info=True)
             with self.lock:
@@ -97,13 +94,16 @@ class ModelManager:
             if self.status == ModelStatus.LOADING:
                 logger.warning(f"请求切换到 '{new_model_name}'，但当前正在加载 '{self.model_name}'。请稍后重试。")
                 return {"status": "loading_busy", "message": f"Cannot switch, currently loading {self.model_name}"}
+
             if self.model_name == new_model_name and self.status == ModelStatus.READY:
                 logger.info(f"模型 '{new_model_name}' 已是当前加载的模型。")
                 return {"status": "already_loaded", "name": new_model_name}
+
             model_path = os.path.join(MODELS_PATH, new_model_name)
             if not os.path.exists(model_path):
                 logger.error(f"请求切换的模型文件不存在: {model_path}")
                 return {"status": "error", "message": "模型文件不存在"}
+
             thread = threading.Thread(target=self._load_model_in_background, args=(new_model_name,), name=f"ModelLoader-{new_model_name}")
             thread.daemon = True
             thread.start()
@@ -118,6 +118,11 @@ class ModelManager:
                 "error_message": self.error_message,
                 "device": "GPU" if IS_GPU_AVAILABLE else "CPU"
             }
+
+    def get_model_instance(self):
+        if self.status == ModelStatus.READY:
+            return self.model
+        return None
 
 model_manager = ModelManager()
 
@@ -146,50 +151,29 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
         return inference_pb2.SwitchModelResponse(success=success, message=message)
 
     def ChatStream(self, request, context):
-        with model_manager.lock:
-            model = model_manager.model
-            chat_handler = model_manager.chat_handler
-            status = model_manager.status
+        model = model_manager.get_model_instance()
+        if model is None:
             status_info = model_manager.get_current_status()
-        if status != ModelStatus.READY or model is None:
-            error_msg = f"[SYSTEM-ERROR] Model is not ready. Current status: {status_info['status']}."
+            error_msg = f"[SYSTEM-ERROR] Model is not ready. Status: {status_info['status']}."
             if status_info['status'] == 'ERROR':
                 error_msg += f" Details: {status_info['error_message']}"
             yield inference_pb2.ChatResponse(error_message=error_msg)
             return
 
         messages = [{"role": "user", "content": request.query}]
-        # ★ 优先使用 chat_handler (如果模型支持)
-        if chat_handler:
-            try:
-                handler_result = chat_handler(messages=messages)
-                prompt_for_model = handler_result['prompt']
-                stop_sequences = handler_result.get('stop', [])
-                stream = model(
-                    prompt=prompt_for_model,
-                    max_tokens=4096,
-                    stop=stop_sequences,
-                    stream=True
-                )
-                for output in stream:
-                    content = output["choices"][0].get("text", "")
-                    if content:
-                        yield inference_pb2.ChatResponse(token=content)
-            except Exception as e:
-                logger.error(f"使用聊天处理器生成时出错: {e}", exc_info=True)
-                yield inference_pb2.ChatResponse(error_message=f"[SYSTEM-ERROR] Chat processing error: {e}")
-        # ★ 如果没有模板，降级为原始文本续写
-        else:
-            logger.warning(f"模型 '{model_manager.model_name}' 没有聊天模板, 将执行原始文本生成。")
-            try:
-                stream = model(prompt=request.query, max_tokens=4096, stream=True)
-                for output in stream:
-                    content = output["choices"][0].get("text", "")
-                    if content:
-                        yield inference_pb2.ChatResponse(token=content)
-            except Exception as e:
-                logger.error(f"原始文本生成时出错: {e}", exc_info=True)
-                yield inference_pb2.ChatResponse(error_message=f"[SYSTEM-ERROR] Raw generation error: {e}")
+        try:
+            # llama-cpp-python自动格式化，不污染 Qwen
+            stream = model.create_chat_completion(messages=messages, stream=True)
+            for output in stream:
+                # 兼容llama-cpp-python v0.2.72+格式
+                token = output["choices"][0].get("delta", {}).get("content", None)
+                if token is None:
+                    token = output["choices"][0].get("text", "")
+                if token:
+                    yield inference_pb2.ChatResponse(token=token)
+        except Exception as e:
+            logger.error(f"聊天生成过程中出错: {e}", exc_info=True)
+            yield inference_pb2.ChatResponse(error_message=f"[SYSTEM-ERROR] An error occurred during inference: {e}")
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -217,7 +201,6 @@ def serve():
         while True:
             time.sleep(86400)
     except KeyboardInterrupt:
-        logger.info("服务关闭。")
         server.stop(0)
 
 if __name__ == '__main__':
