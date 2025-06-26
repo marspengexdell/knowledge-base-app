@@ -2,7 +2,7 @@ import os
 import logging
 from llama_cpp import Llama
 from sentence_transformers import SentenceTransformer
-from .utils import get_chat_format   # 新增
+from .utils import get_chat_handler
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -13,6 +13,7 @@ class RAGService:
         self.db_path = db_path
 
         self.generation_model = None
+        self.chat_handler = None      # 新增
         self.embedding_model = None
 
         self.current_generation_model_name = None
@@ -42,30 +43,30 @@ class RAGService:
             logging.error(f"生成模型文件不存在: {self.current_generation_model_name}")
             return
         try:
-            # 自动检测并适配 chat_format
-            chat_format = get_chat_format(model_path)
             self.generation_model = Llama(
                 model_path=model_path,
                 n_gpu_layers=-1,
                 n_ctx=4096,
-                chat_format=chat_format,
                 verbose=True
             )
-            logging.info(f"成功加载生成模型: {model_path} (chat_format={chat_format})")
+            logging.info(f"成功加载生成模型: {model_path}")
+
+            # 用新方法加载聊天处理器
+            self.chat_handler = get_chat_handler(model_path)
+            if not self.chat_handler:
+                logging.warning(f"无法自动识别聊天模板，{model_path} 不能进行chat对话")
         except Exception as e:
-            logging.error(f"加载生成模型失败: {e}")
+            logging.error(f"加载生成模型或聊天模板失败: {e}", exc_info=True)
+            self.generation_model = None
+            self.chat_handler = None
 
     def load_embedding_model(self, model_name=None):
-        """
-        支持 gguf/safetensors 也支持 sentence-transformers 格式（如bge、m3e等）。
-        """
         if model_name:
             self.current_embedding_model_name = model_name
         if not self.current_embedding_model_name:
             logging.error("没有指定嵌入模型名称。")
             return
 
-        # 1. sentence-transformers 格式优先（如 models/embedding-model/bge-base-zh/）
         path = os.path.join(self.embed_model_dir, self.current_embedding_model_name)
         if os.path.isdir(path) and os.path.exists(os.path.join(path, "config.json")):
             try:
@@ -75,7 +76,6 @@ class RAGService:
             except Exception as e:
                 logging.error(f"加载 sentence-transformers 嵌入模型失败: {e}")
 
-        # 2. 如果是 .gguf/.safetensors 格式嵌入模型（极少数情况）
         model_path = self.find_model_path(self.current_embedding_model_name, self.model_dir)
         if model_path and (model_path.endswith(".gguf") or model_path.endswith(".safetensors")):
             try:
@@ -91,13 +91,8 @@ class RAGService:
         logging.error(f"未能加载任何嵌入模型: {self.current_embedding_model_name}")
 
     def list_models(self):
-        """
-        返回生成模型列表、嵌入模型列表（huggingface格式和gguf格式都能识别）
-        """
         generation_models = []
         embedding_models = []
-
-        # 生成模型（.gguf/.safetensors）
         if os.path.exists(self.model_dir):
             for filename in os.listdir(self.model_dir):
                 if filename.endswith('.gguf') or filename.endswith('.safetensors'):
@@ -106,7 +101,6 @@ class RAGService:
                         embedding_models.append(filename)
                     else:
                         generation_models.append(filename)
-        # 嵌入模型（sentence-transformers 格式文件夹）
         if os.path.exists(self.embed_model_dir):
             for d in os.listdir(self.embed_model_dir):
                 sub = os.path.join(self.embed_model_dir, d)
@@ -129,28 +123,49 @@ class RAGService:
         if not self.generation_model:
             yield "模型未加载，请检查服务端日志。"
             return
+
+        # 优先chat_handler，若没有chat模板，自动降级到基础 completion
+        if not self.chat_handler:
+            try:
+                stream = self.generation_model(
+                    prompt=prompt,
+                    max_tokens=4096,
+                    stream=True
+                )
+                for output in stream:
+                    token = output["choices"][0].get("text", "")
+                    if token:
+                        yield token
+            except Exception as e:
+                logging.error(f"文本生成时遇到错误: {e}", exc_info=True)
+                yield f"文本生成时遇到错误: {e}"
+            return
+
         try:
-            stream = self.generation_model.create_chat_completion(
-                messages=[{"role": "user", "content": prompt}],
+            messages = [{"role": "user", "content": prompt}]
+            handler_result = self.chat_handler(messages=messages)
+            final_prompt = handler_result['prompt']
+            stop_sequences = handler_result['stop']
+            stream = self.generation_model(
+                prompt=final_prompt,
+                stop=stop_sequences,
+                max_tokens=4096,
                 stream=True
             )
             for output in stream:
-                token = output["choices"][0]["delta"].get("content")
+                token = output["choices"][0].get("text", "")
                 if token:
                     yield token
         except Exception as e:
+            logging.error(f"文本生成时遇到错误: {e}", exc_info=True)
             yield f"文本生成时遇到错误: {e}"
 
     def embed(self, text):
-        """
-        对文本做向量化（根据加载模型的类型自动分流）。
-        """
         if not self.embedding_model:
             raise Exception("未加载嵌入模型")
         if isinstance(self.embedding_model, SentenceTransformer):
             return self.embedding_model.encode([text])[0]
         elif isinstance(self.embedding_model, Llama):
-            # 假如以后用 llama.cpp 做 embedding
             return self.embedding_model.create_embedding(text)
         else:
-            raise Except
+            raise Exception("未知的embedding模型类型")
