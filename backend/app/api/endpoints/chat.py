@@ -28,7 +28,6 @@ async def websocket_chat(websocket: WebSocket):
                 continue
 
             logger.info(f"Received query: {user_query}")
-            
 
             try:
                 async for token in grpc_client_manager.chat(user_query):
