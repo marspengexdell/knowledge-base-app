@@ -3,13 +3,13 @@ from fastapi import APIRouter, UploadFile, File
 from ...core.grpc_client import grpc_client_manager
 from ...core.settings import settings
 from ..schemas.admin import ModelSwitchRequest
-from ...services.model_store import list_models as list_available_models, switch_generation_model
+from ...services.model_store import switch_generation_model
+from ...protos import inference_pb2
 
 router = APIRouter()
 
 @router.post("/models/upload")
 async def upload_model(file: UploadFile = File(...)):
-    # 保存上传的模型文件到指定目录
     model_dir = settings.MODEL_DIR
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
@@ -22,12 +22,16 @@ async def upload_model(file: UploadFile = File(...)):
 @router.post("/models/switch")
 async def switch_model(request: ModelSwitchRequest):
     model_name = request.model_name
+    model_type_str = request.model_type.upper()  # "GENERATION" or "EMBEDDING"
+    model_type_enum = inference_pb2.ModelType.Value(request.model_type)
+
     if not model_name:
         return {"success": False, "message": "参数错误：缺少 model_name"}
-    await grpc_client_manager.connect()
+    if not grpc_client_manager.stub:
+        await grpc_client_manager.connect()
     try:
-        success, message = await grpc_client_manager.switch_model(model_name, "generation")
-        if success:
+        success, message = await grpc_client_manager.switch_model(model_name, model_type_enum)
+        if success and model_type_str == "GENERATION":
             switch_generation_model(model_name)
         return {"success": success, "message": message}
     except Exception as e:
@@ -41,7 +45,7 @@ async def get_models():
         return models
     except Exception as e:
         try:
-            # fallback to local listing without device info
+            from ...services.model_store import list_models as list_available_models
             models = list_available_models()
             models["device"] = ""
             return models
@@ -57,13 +61,13 @@ async def get_models():
 
 @router.get("/models/status")
 async def get_model_status():
-    # 与 /models 接口返回内容相同
     try:
         await grpc_client_manager.connect()
         models = await grpc_client_manager.list_models()
         return models
     except Exception as e:
         try:
+            from ...services.model_store import list_models as list_available_models
             models = list_available_models()
             models["device"] = ""
             return models
