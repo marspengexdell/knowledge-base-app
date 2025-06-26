@@ -1,33 +1,27 @@
-import json
 import os
+import logging
 from llama_cpp import Llama
 
-MODELS_PATH = "/models/"
-CONFIG_PATH = "/app/model_config.json"
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-def get_chat_format(model_path, config_path=CONFIG_PATH):
+def get_chat_handler(model_path: str):
     """
-    自动根据模型元数据+配置，判断chat_format
+    自动根据模型元数据获取聊天处理器，无需外部配置文件。
     """
-    # 读取 chat_format 配置
-    if os.path.exists(config_path):
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        model_chat_formats = config.get("model_chat_formats", {})
-        default_chat_format = config.get("default_chat_format", "llama-2")
-    else:
-        model_chat_formats = {"llama": "llama-2"}
-        default_chat_format = "llama-2"
-
+    logger.info(f"正在为模型 '{os.path.basename(model_path)}' 自动检测聊天模板...")
     try:
-        temp_llama = Llama(model_path=model_path, n_ctx=256, n_gpu_layers=0, verbose=False)
-        metadata = temp_llama.metadata
-        architecture = metadata.get('general.architecture')
-        del temp_llama
-
-        if architecture and architecture in model_chat_formats:
-            return model_chat_formats[architecture]
-        else:
-            return default_chat_format
+        # 只轻量读取元数据
+        llama = Llama(model_path=model_path, n_ctx=256, n_gpu_layers=0, verbose=False)
+        chat_template = llama.metadata.get("tokenizer.chat_template")
+        if chat_template:
+            logger.info("成功从模型元数据中提取到聊天模板")
+            chat_handler = llama.chat_handler_from_template(chat_template)
+            del llama
+            return chat_handler
+        logger.warning("未找到聊天模板，无法自动处理聊天格式。")
+        del llama
+        return None
     except Exception as e:
-        return default_chat_format
+        logger.error(f"读取模型元数据失败: {e}", exc_info=True)
+        return None
