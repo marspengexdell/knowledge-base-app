@@ -1,5 +1,3 @@
-# backend/app/services/embedding.py
-
 from sentence_transformers import SentenceTransformer
 import threading
 
@@ -21,10 +19,8 @@ class EmbeddingModel:
             self.initialized = True
 
     def embed(self, texts):
-        # 支持单文本或多文本
         if isinstance(texts, str):
             texts = [texts]
         return self.model.encode(texts, show_progress_bar=False, normalize_embeddings=True).tolist()
 
-# 单例对象
 embedding_model = EmbeddingModel()

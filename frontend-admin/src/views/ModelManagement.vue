@@ -104,7 +104,6 @@ import axios from 'axios';
 import { ElMessage } from 'element-plus';
 import { UploadFilled } from '@element-plus/icons-vue';
 
-// 状态
 const modelsInfo = ref({
   generation_models: [],
   embedding_models: [],
@@ -112,21 +111,17 @@ const modelsInfo = ref({
   current_embedding_model: '',
   device: ''
 });
-
 const selection = reactive({
   generationModel: '',
   embeddingModel: ''
 });
-
 const loading = reactive({
   generation: false,
   embedding: false
 });
-
 const uploadUrl = '/api/admin/models/upload';
-const uploadHeaders = {}; // 需要 token 可以设置
+const uploadHeaders = {};
 
-// 获取模型列表
 const fetchModels = async () => {
   try {
     const { data } = await axios.get('/api/admin/models');
@@ -139,7 +134,6 @@ const fetchModels = async () => {
   }
 };
 
-// 上传前校验
 const beforeUpload = (file) => {
   const isValid = file.name.endsWith('.gguf') || file.name.endsWith('.safetensors');
   if (!isValid) {
@@ -148,7 +142,7 @@ const beforeUpload = (file) => {
   return isValid;
 };
 
-const handleUploadSuccess = (res, file) => {
+const handleUploadSuccess = (res) => {
   ElMessage.success(res.message || '模型上传成功！');
   fetchModels();
 };
@@ -158,7 +152,6 @@ const handleUploadError = (err) => {
   console.error(err);
 };
 
-// 切换模型
 const handleSwitchModel = async (modelType) => {
   const modelName = modelType === 'generation' ? selection.generationModel : selection.embeddingModel;
   if (!modelName) {
@@ -171,7 +164,6 @@ const handleSwitchModel = async (modelType) => {
       model_name: modelName,
       model_type: modelType,
     };
-
     const { data } = await axios.post('/api/admin/models/switch', payload);
     ElMessage.success(data.message || '模型切换成功！');
     await fetchModels();
