@@ -26,6 +26,14 @@ From the repository root, execute:
 docker compose up --build
 ```
 
+Set the optional `EMBEDDING_MODEL` environment variable to the relative path of
+an embedding model under `models/` if you want to load a specific one at
+startup. For example:
+
+```bash
+EMBEDDING_MODEL=embedding-model/bge-base-zh/ docker compose up
+```
+
 If the build fails with an error such as `Option python_package unknown`, your
 Docker cache may still contain an old copy of `inference.proto`. Rebuilding
 without the cache ensures the latest proto file bundled with `grpcio-tools` is
@@ -63,7 +71,7 @@ cp ~/Downloads/my-llama-model.gguf models/
 
 The inference service looks for generation and embedding models inside the `models/` directory, which is mounted into the containers. At least one generation model (`.gguf` or `.safetensors` file) must exist for the chat interface to produce responses. Place your Llama model file directly under `models/` and restart the stack.
 
-Embedding models can be placed under `models/embedding-model/`. A list of URLs for an example embedding model is provided in `models/urls.txt`. Download the files to that folder if you want to enable embedding retrieval. When the inference service starts it will automatically load the first generation and embedding models it discovers.
+Embedding models can be placed under `models/embedding-model/`. A list of URLs for an example embedding model is provided in `models/urls.txt`. Download the files to that folder **before running `docker compose up`** if you want to enable embedding retrieval. When the inference service starts it will automatically load the first generation and embedding models it discovers.
 
 Once the files are in place you can visit `http://localhost:8081/model-management` to switch or upload models.
 
