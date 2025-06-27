@@ -193,14 +193,42 @@ model_manager = ModelManager()
 
 class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
     def ListAvailableModels(self, request, context):
+        generation_models = []
+        embedding_models = []
+
+        # 扫描主模型目录
         try:
-            generation_models = [f for f in os.listdir(MODELS_PATH) if f.endswith('.gguf')]
+            for f in os.listdir(MODELS_PATH):
+                path = os.path.join(MODELS_PATH, f)
+                if f.endswith('.gguf'):
+                    if "embed" in f.lower() or "embedding" in f.lower():
+                        embedding_models.append(f)
+                    else:
+                        generation_models.append(f)
         except FileNotFoundError:
-            generation_models = []
+            logger.warning(f"主模型目录 {MODELS_PATH} 未找到。")
+
+        # 扫描嵌入模型专用目录，兼容 huggingface 结构和 .safetensors/.gguf 文件
+        embed_dir = os.path.join(MODELS_PATH, "embedding-model")
+        if os.path.isdir(embed_dir):
+            for sub in os.listdir(embed_dir):
+                sub_path = os.path.join(embed_dir, sub)
+                if os.path.isdir(sub_path):
+                    # huggingface 目录模式
+                    embedding_models.append(os.path.join("embedding-model", sub))
+                elif sub.endswith('.gguf') or sub.endswith('.safetensors'):
+                    embedding_models.append(os.path.join("embedding-model", sub))
+
         current_generation_model = model_manager.model_name if model_manager.status in [ModelStatus.READY, ModelStatus.LOADING] else ""
+        current_embedding_model = embedding_models[0] if embedding_models else ""
+        device = "GPU" if IS_GPU_AVAILABLE else "CPU"
+
         return inference_pb2.ModelListResponse(
             generation_models=generation_models,
+            embedding_models=embedding_models,
             current_generation_model=current_generation_model,
+            current_embedding_model=current_embedding_model,
+            device=device
         )
 
     def SwitchModel(self, request, context):
@@ -210,7 +238,6 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
         return inference_pb2.SwitchModelResponse(success=success, message=message)
 
     def ChatStream(self, request, context):
-        # 支持后续加多轮历史（如request.history），现在只用query
         try:
             for token in model_manager.infer_stream(query=request.query, history=None):
                 yield inference_pb2.ChatResponse(token=token)
