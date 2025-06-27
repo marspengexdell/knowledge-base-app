@@ -1,102 +1,3 @@
-<template>
-  <div>
-    <el-card shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>模型管理</span>
-        </div>
-      </template>
-      <!-- Display Current Models -->
-      <el-descriptions title="当前加载模型" :column="2" border>
-        <el-descriptions-item label="生成模型">
-          <el-tag v-if="modelsInfo.current_generation_model" type="success">
-            {{ modelsInfo.current_generation_model }}
-          </el-tag>
-          <span v-else>未加载</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="嵌入模型">
-          <el-tag v-if="modelsInfo.current_embedding_model" type="success">
-            {{ modelsInfo.current_embedding_model }}
-          </el-tag>
-          <span v-else>未加载</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="设备">
-          <el-tag>{{ modelsInfo.device || '未知' }}</el-tag>
-        </el-descriptions-item>
-      </el-descriptions>
-
-      <!-- Upload Models -->
-      <el-divider content-position="left">上传模型文件</el-divider>
-      <el-upload
-        class="upload-demo"
-        :action="uploadUrl"
-        :headers="uploadHeaders"
-        :show-file-list="false"
-        :before-upload="beforeUpload"
-        :on-success="handleUploadSuccess"
-        :on-error="handleUploadError"
-        :with-credentials="false"
-        drag
-      >
-        <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-        <div class="el-upload__text">将模型文件拖到此处，或 <em>点击上传</em></div>
-        <div class="el-upload__tip" slot="tip">
-          只支持 .gguf / .safetensors 文件，建议 Chrome/Edge 浏览器。
-        </div>
-      </el-upload>
-
-      <!-- Switch Models Form -->
-      <el-divider content-position="left">切换模型</el-divider>
-      <el-form :model="selection" label-width="120px" class="model-form">
-        <el-form-item label="选择生成模型">
-          <el-select
-            v-model="selection.generationModel"
-            placeholder="请选择可用的生成模型"
-            class="model-select"
-            filterable
-            clearable
-          >
-            <el-option
-              v-for="model in modelsInfo.generation_models"
-              :key="model"
-              :label="model"
-              :value="model"
-            />
-          </el-select>
-          <el-button
-            @click="handleSwitchModel('generation')"
-            :loading="loading.generation"
-            type="primary"
-            class="switch-button"
-          >加载</el-button>
-        </el-form-item>
-        <el-form-item label="选择嵌入模型">
-          <el-select
-            v-model="selection.embeddingModel"
-            placeholder="请选择可用的嵌入模型"
-            class="model-select"
-            filterable
-            clearable
-          >
-            <el-option
-              v-for="model in modelsInfo.embedding_models"
-              :key="model"
-              :label="model"
-              :value="model"
-            />
-          </el-select>
-          <el-button
-            @click="handleSwitchModel('embedding')"
-            :loading="loading.embedding"
-            type="primary"
-            class="switch-button"
-          >加载</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-  </div>
-</template>
-
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
 import axios from 'axios';
@@ -152,7 +53,6 @@ const handleUploadError = (err) => {
 };
 
 const handleSwitchModel = async (modelType) => {
-  // 一定要用 selection 对象内的值
   const modelName = modelType === 'generation' ? selection.generationModel : selection.embeddingModel;
   if (!modelName) {
     ElMessage.warning('请先选择一个模型！');
@@ -162,10 +62,10 @@ const handleSwitchModel = async (modelType) => {
   try {
     await axios.post('/api/admin/models/switch', {
       model_name: modelName,
-      model_type: modelType
+      model_type: modelType.toUpperCase()    // ★ 关键修正点：转大写
     });
     ElMessage.success('模型切换请求已发送！');
-    setTimeout(fetchModels, 2000); // 可选，等待后端切换完成
+    setTimeout(fetchModels, 2000);
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || '模型切换失败！');
     console.error(error);
@@ -176,22 +76,3 @@ const handleSwitchModel = async (modelType) => {
 
 onMounted(fetchModels);
 </script>
-
-<style scoped>
-.card-header {
-  font-weight: bold;
-  font-size: 1.2em;
-}
-.model-form {
-  margin-top: 20px;
-}
-.model-select {
-  width: 400px;
-}
-.switch-button {
-  margin-left: 10px;
-}
-.upload-demo {
-  margin: 20px 0;
-}
-</style>
