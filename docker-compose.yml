@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -10,7 +8,7 @@ services:
     volumes:
       - ./backend/app:/app/app
       - ./models:/models:ro
-      - ./knowledge_base_docs:/app/knowledge_base_docs
+      - ./knowledge_base_docs:/app/app/knowledge_base_docs   # <== 修正这里！
     environment:
       - GRPC_SERVER_ADDRESS=inference:50051
       - VECTOR_DB_HOST=vector-db
@@ -41,7 +39,7 @@ services:
     ports:
       - "8081:80"
     volumes:
-      - ./frontend-admin:/app      
+      - ./frontend-admin:/app
     depends_on:
       - backend
     networks:
