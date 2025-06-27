@@ -6,7 +6,6 @@
           <span>模型管理</span>
         </div>
       </template>
-
       <!-- Display Current Models -->
       <el-descriptions title="当前加载模型" :column="2" border>
         <el-descriptions-item label="生成模型">
@@ -153,6 +152,7 @@ const handleUploadError = (err) => {
 };
 
 const handleSwitchModel = async (modelType) => {
+  // 一定要用 selection 对象内的值
   const modelName = modelType === 'generation' ? selection.generationModel : selection.embeddingModel;
   if (!modelName) {
     ElMessage.warning('请先选择一个模型！');
@@ -160,13 +160,12 @@ const handleSwitchModel = async (modelType) => {
   }
   loading[modelType] = true;
   try {
-    const payload = {
+    await axios.post('/api/admin/models/switch', {
       model_name: modelName,
-      model_type: modelType,
-    };
-    const { data } = await axios.post('/api/admin/models/switch', payload);
-    ElMessage.success(data.message || '模型切换成功！');
-    await fetchModels();
+      model_type: modelType
+    });
+    ElMessage.success('模型切换请求已发送！');
+    setTimeout(fetchModels, 2000); // 可选，等待后端切换完成
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || '模型切换失败！');
     console.error(error);
