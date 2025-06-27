@@ -9,7 +9,8 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/app:/app/app
-      - ./models:/models:ro      # ★ 新增：把模型目录挂载进来
+      - ./models:/models:ro      # ★ 挂载模型目录（只读）
+      - ./knowledge_base_docs:/app/knowledge_base_docs   # ★ 新增：持久化知识库文档目录
     environment:
       - GRPC_SERVER_ADDRESS=inference:50051
       - VECTOR_DB_HOST=vector-db
