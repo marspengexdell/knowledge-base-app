@@ -14,7 +14,7 @@
             class="upload-demo"
             drag
             :action="uploadUrl"
-            name="file"
+            name="file"  
             :limit="1"
             :on-exceed="handleExceed"
             :auto-upload="false"
@@ -47,7 +47,7 @@ import { UploadFilled } from '@element-plus/icons-vue';
 
 const activeTab = ref('file');
 const uploadRef = ref();
-const uploadUrl = '/api/admin/knowledge/upload';
+const uploadUrl = '/api/admin/documents/upload'; // ✅ 修正路径
 
 const submitUpload = () => {
   uploadRef.value?.submit();
