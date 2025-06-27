@@ -3,7 +3,7 @@ from fastapi import APIRouter, UploadFile, File
 from ...core.grpc_client import grpc_client_manager
 from ...core.settings import settings
 from ..schemas.admin import ModelSwitchRequest
-from ...services.model_store import switch_generation_model
+from ...services.model_store import switch_generation_model, switch_embedding_model
 from ...protos import inference_pb2
 
 router = APIRouter()
@@ -31,8 +31,12 @@ async def switch_model(request: ModelSwitchRequest):
         await grpc_client_manager.connect()
     try:
         success, message = await grpc_client_manager.switch_model(model_name, model_type_enum)
-        if success and model_type_str == "GENERATION":
-            switch_generation_model(model_name)
+        # 支持嵌入模型和生成模型的本地状态持久化
+        if success:
+            if model_type_str == "GENERATION":
+                switch_generation_model(model_name)
+            elif model_type_str == "EMBEDDING":
+                switch_embedding_model(model_name)
         return {"success": success, "message": message}
     except Exception as e:
         return {"success": False, "message": f"切换模型失败: {e}"}

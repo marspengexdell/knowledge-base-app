@@ -36,7 +36,12 @@ def list_models() -> dict:
         embed_dir = os.path.join(MODEL_DIR, "embedding-model")
         if os.path.isdir(embed_dir):
             for sub in os.listdir(embed_dir):
-                if sub.endswith(".gguf") or sub.endswith(".safetensors"):
+                sub_path = os.path.join(embed_dir, sub)
+                # 新增：支持 huggingface 目录（如 bge-base-zh 文件夹）
+                if os.path.isdir(sub_path):
+                    embedding_models.append(os.path.join("embedding-model", sub))
+                # 兼容：也支持单独的 .gguf/.safetensors 文件
+                elif sub.endswith(".gguf") or sub.endswith(".safetensors"):
                     embedding_models.append(os.path.join("embedding-model", sub))
     active = _load_active()
     return {
@@ -53,5 +58,15 @@ def switch_generation_model(model_name: str) -> bool:
         return False
     active = _load_active()
     active["generation"] = model_name
+    _save_active(active)
+    return True
+
+def switch_embedding_model(model_name: str) -> bool:
+    """Set the active embedding model if it exists."""
+    models = list_models()
+    if model_name not in models["embedding_models"]:
+        return False
+    active = _load_active()
+    active["embedding"] = model_name
     _save_active(active)
     return True
