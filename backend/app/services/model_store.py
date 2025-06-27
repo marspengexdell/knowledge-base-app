@@ -3,8 +3,6 @@ import os
 from pathlib import Path
 
 MODEL_DIR = "/models"
-# Shared file storing the currently selected generation and embedding models.
-# It is mounted into both the backend and inference containers.
 ACTIVE_MODELS_FILE = Path("/models/active_models.json")
 
 def _ensure_file():
@@ -22,7 +20,6 @@ def _save_active(data: dict) -> None:
     ACTIVE_MODELS_FILE.write_text(json.dumps(data))
 
 def list_models() -> dict:
-    """Return available models and current active models."""
     generation_models = []
     embedding_models = []
     if os.path.isdir(MODEL_DIR):
@@ -37,10 +34,8 @@ def list_models() -> dict:
         if os.path.isdir(embed_dir):
             for sub in os.listdir(embed_dir):
                 sub_path = os.path.join(embed_dir, sub)
-                # 新增：支持 huggingface 目录（如 bge-base-zh 文件夹）
                 if os.path.isdir(sub_path):
                     embedding_models.append(os.path.join("embedding-model", sub))
-                # 兼容：也支持单独的 .gguf/.safetensors 文件
                 elif sub.endswith(".gguf") or sub.endswith(".safetensors"):
                     embedding_models.append(os.path.join("embedding-model", sub))
     active = _load_active()
@@ -52,7 +47,6 @@ def list_models() -> dict:
     }
 
 def switch_generation_model(model_name: str) -> bool:
-    """Set the active generation model if it exists."""
     models = list_models()
     if model_name not in models["generation_models"]:
         return False
@@ -62,7 +56,6 @@ def switch_generation_model(model_name: str) -> bool:
     return True
 
 def switch_embedding_model(model_name: str) -> bool:
-    """Set the active embedding model if it exists."""
     models = list_models()
     if model_name not in models["embedding_models"]:
         return False
