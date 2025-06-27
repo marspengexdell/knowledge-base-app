@@ -4,12 +4,13 @@ pydantic==2.7.1
 requests==2.31.0
 sqlmodel==0.0.16
 python-dotenv==1.0.1
-grpcio>=1.73.0
-grpcio-tools>=1.73.0
+grpcio==1.48.2
+grpcio-tools==1.48.2
 websockets==12.0
 pydantic-settings==2.1.0
 python-multipart==0.0.9
-protobuf>=6.31.0
+protobuf==3.20.3
 sentence-transformers>=2.3.0
 torch>=1.10.0
 numpy
+chromadb-client
