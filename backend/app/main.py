@@ -8,6 +8,7 @@ import grpc
 from app.api.endpoints.admin import router as admin_router
 from app.api.endpoints.chat import router as chat_router
 from app.api.endpoints.embedding import router as embedding_router
+from app.api.endpoints.knowledge import router as knowledge_router   # 新增这一行
 import app.protos.inference_pb2_grpc as inference_pb2_grpc
 
 # 日志配置
@@ -21,7 +22,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# 全局 CORS 设置（允许所有源，开发环境推荐，生产可限制）
+# 全局 CORS 设置
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -52,9 +53,10 @@ async def shutdown_event():
     # FastAPI 会自动清理后台任务和连接
 
 # 注册各 API 路由
-app.include_router(admin_router,    prefix="/api/admin",    tags=["admin"])
-app.include_router(chat_router,     prefix="/api/chat",     tags=["chat"])
-app.include_router(embedding_router, prefix="/api/embedding", tags=["embedding"])
+app.include_router(admin_router,     prefix="/api/admin",        tags=["admin"])
+app.include_router(chat_router,      prefix="/api/chat",         tags=["chat"])
+app.include_router(embedding_router, prefix="/api/embedding",    tags=["embedding"])
+app.include_router(knowledge_router, prefix="/api/admin/knowledge", tags=["knowledge"])   # <-- 注册知识库路由
 
 @app.get("/")
 def read_root():
