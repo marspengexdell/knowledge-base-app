@@ -5,6 +5,8 @@ from ...core.grpc_client import grpc_client_manager
 from ...services.knowledge_base import kb_service
 import logging
 
+END_TOKEN = "<END>"
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -17,7 +19,8 @@ def build_prompt_with_context(query: str, context: list[str]) -> str:
     prompt = f"""
     请根据以下提供的上下文信息来回答用户的问题。请确保你的回答完全基于这些信息，
 不要使用任何外部知识。如果上下文信息不足以回答问题，请直接说“根据我掌握的知识，
-我无法回答这个问题”。在回答时，请先分步骤思考，再给出最终的结论。
+我无法回答这个问题”。在回答时，请先分步骤思考，再给出最终的结论，
+并在最终结论后输出 {END_TOKEN} 作为结束标记。
 
     上下文信息:
     ---

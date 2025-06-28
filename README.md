@@ -67,6 +67,12 @@ Embedding models can be placed under `models/embedding-model/`. A list of URLs f
 
 Once the files are in place you can visit `http://localhost:8081/model-management` to switch or upload models.
 
+### Generation Limits
+
+The inference service streams at most `150` new tokens by default. Set the
+`MAX_NEW_TOKENS` environment variable to change this limit. If `STOP_TOKEN` is
+defined, generation stops early whenever the substring appears in the output.
+
 ### Switching Models via API
 
 The backend exposes a `POST /api/admin/models/switch` endpoint. The request body
@@ -113,6 +119,13 @@ docker compose up
 ```
 
 Rebuilding guarantees the containers use the updated packages.
+
+### Stop Token
+
+During chat generation the backend instructs the model to append `<END>` once it
+finishes reasoning. The inference service watches the output stream and stops
+producing further tokens as soon as this marker appears. The WebSocket client
+still receives `[DONE]` when the stream ends.
 
 ### Updating PyTorch Wheels
 
