@@ -114,6 +114,13 @@ docker compose up
 
 Rebuilding guarantees the containers use the updated packages.
 
+### Stop Token
+
+During chat generation the backend instructs the model to append `<END>` once it
+finishes reasoning. The inference service watches the output stream and stops
+producing further tokens as soon as this marker appears. The WebSocket client
+still receives `[DONE]` when the stream ends.
+
 ### Updating PyTorch Wheels
 
 The inference image installs PyTorch from local wheel files found in

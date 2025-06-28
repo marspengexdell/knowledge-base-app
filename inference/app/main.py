@@ -125,11 +125,40 @@ class ModelManager:
             raise RuntimeError("模型未就绪")
         messages = history[:] if history else []
         messages.append({"role": "user", "content": query})
+        end_token = "<END>"
+        generated = ""
+        last_idx = 0
         if self.model_type in ("qwen", "yi"):
             prompt = build_prompt_qwen(messages)
-            yield from (o["choices"][0].get("text", "") for o in self.model.create_completion(prompt=prompt, stream=True))
+            stream = self.model.create_completion(prompt=prompt, stream=True)
+            for output in stream:
+                token = output["choices"][0].get("text", "")
+                if not token:
+                    continue
+                generated += token
+                if end_token in generated:
+                    stop = generated.index(end_token)
+                    if stop > last_idx:
+                        yield generated[last_idx:stop]
+                    break
+                if len(generated) > last_idx:
+                    yield generated[last_idx:]
+                    last_idx = len(generated)
         else:
-            yield from (o["choices"][0].get("delta", {}).get("content", "") for o in self.model.create_chat_completion(messages=messages, stream=True))
+            stream = self.model.create_chat_completion(messages=messages, stream=True)
+            for output in stream:
+                token = output["choices"][0].get("delta", {}).get("content", "")
+                if not token:
+                    continue
+                generated += token
+                if end_token in generated:
+                    stop = generated.index(end_token)
+                    if stop > last_idx:
+                        yield generated[last_idx:stop]
+                    break
+                if len(generated) > last_idx:
+                    yield generated[last_idx:]
+                    last_idx = len(generated)
 
 model_manager = ModelManager()
 
