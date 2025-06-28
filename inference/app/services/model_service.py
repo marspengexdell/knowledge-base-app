@@ -4,6 +4,8 @@ from llama_cpp import Llama
 from sentence_transformers import SentenceTransformer
 from .utils import get_chat_handler
 
+USE_CACHE = os.getenv("LLAMA_USE_CACHE", "1").lower() not in ("0", "false", "no")
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class RAGService:
@@ -130,7 +132,8 @@ class RAGService:
                 stream = self.generation_model(
                     prompt=prompt,
                     max_tokens=4096,
-                    stream=True
+                    stream=True,
+                    use_cache=USE_CACHE,
                 )
                 for output in stream:
                     token = output["choices"][0].get("text", "")
@@ -150,7 +153,8 @@ class RAGService:
                 prompt=final_prompt,
                 stop=stop_sequences,
                 max_tokens=4096,
-                stream=True
+                stream=True,
+                use_cache=USE_CACHE,
             )
             for output in stream:
                 token = output["choices"][0].get("text", "")

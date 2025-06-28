@@ -122,6 +122,13 @@ When upgrading PyTorch, manually download the CUDA 12.1 builds of
 `torch`, `torchvision` and `torchaudio` from the official
 [PyTorch wheel index](https://download.pytorch.org/whl/cu121) and place them in
 that directory before rebuilding the containers.
+
+### Caching with `llama_cpp`
+
+The inference service now enables key/value caching when generating text. This
+improves throughput but increases memory usage. Set the environment variable
+`LLAMA_USE_CACHE=0` when starting the container to disable caching if your
+system has limited RAM.
 ### Regenerating gRPC Stubs
 
 If you modify `inference.proto`, regenerate the Python stubs so that both the

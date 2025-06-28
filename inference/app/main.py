@@ -15,6 +15,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 MODELS_PATH = "/models/"
+USE_CACHE = os.getenv("LLAMA_USE_CACHE", "1").lower() not in ("0", "false", "no")
 
 class ModelStatus(Enum):
     IDLE = "IDLE"
@@ -127,9 +128,19 @@ class ModelManager:
         messages.append({"role": "user", "content": query})
         if self.model_type in ("qwen", "yi"):
             prompt = build_prompt_qwen(messages)
-            yield from (o["choices"][0].get("text", "") for o in self.model.create_completion(prompt=prompt, stream=True))
+            yield from (
+                o["choices"][0].get("text", "")
+                for o in self.model.create_completion(
+                    prompt=prompt, stream=True, use_cache=USE_CACHE
+                )
+            )
         else:
-            yield from (o["choices"][0].get("delta", {}).get("content", "") for o in self.model.create_chat_completion(messages=messages, stream=True))
+            yield from (
+                o["choices"][0].get("delta", {}).get("content", "")
+                for o in self.model.create_chat_completion(
+                    messages=messages, stream=True, use_cache=USE_CACHE
+                )
+            )
 
 model_manager = ModelManager()
 
