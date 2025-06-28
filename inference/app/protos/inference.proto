@@ -6,24 +6,34 @@ service InferenceService {
     rpc ChatStream (ChatRequest) returns (stream ChatResponse);
     rpc ListAvailableModels (Empty) returns (ModelListResponse);
     rpc SwitchModel (SwitchModelRequest) returns (SwitchModelResponse);
+    rpc GetEmbeddingsBatch(EmbeddingBatchRequest) returns (EmbeddingBatchResponse);
 }
 
 
-
 message Empty {}
-
 message ChatRequest {
-    string query = 1;        
+    string query = 1;
     string session_id = 2; 
 }
 
 message ChatResponse {
-    // 响应可以是多种类型中的一种
     oneof response_type {
-        string token = 1;           
-        string error_message = 2;   
-        string source_document = 3; 
+        string token = 1;
+        string error_message = 2;
+        string source_document = 3;
     }
+}
+
+message Embedding {
+    repeated float values = 1;
+}
+
+message EmbeddingBatchRequest {
+    repeated string texts = 1;
+}
+
+message EmbeddingBatchResponse {
+    repeated Embedding embeddings = 1;
 }
 
 message ModelListResponse {
@@ -34,10 +44,9 @@ message ModelListResponse {
     string device = 5;
 }
 
-
 message SwitchModelRequest {
-    string model_name = 1; 
-    ModelType model_type = 2; 
+    string model_name = 1;
+    ModelType model_type = 2;
 }
 
 enum ModelType {
@@ -46,9 +55,7 @@ enum ModelType {
     EMBEDDING = 2;
 }
 
-
 message SwitchModelResponse {
-    bool success = 1;     
-    string message = 2;  
+    bool success = 1;
+    string message = 2;
 }
-
