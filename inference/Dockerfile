@@ -1,68 +1,55 @@
-# ===============================
-# Stage 1: 基础依赖环境（CUDA/Python）
-# ===============================
-FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04 AS base
+# E:\knowledge-base-app\inference\Dockerfile (最终修正版)
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Asia/Shanghai
+# 使用官方 CUDA 镜像
+FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04 as base
 
+# 安装编译依赖和 Python
 RUN apt-get update && apt-get install -y \
     build-essential \
     python3.10 \
     python3-pip \
-    git \
-    cmake \
-    pkg-config \
-    ninja-build \
-    && rm -rf /var/lib/apt/lists/* \
-    && ln -sf /usr/bin/python3 /usr/bin/python
+    && rm -rf /var/lib/apt/lists/*
 
+# 设置 CUDA 路径
 RUN echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/cuda.conf && ldconfig
-ENV PATH="/usr/local/cuda/bin:${PATH}"
 
-# ===============================
-# Stage 2: 安装Python依赖
-# ===============================
-FROM base AS deps
-
+# 创建依赖安装阶段
+FROM base as deps
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-
-# llama-cpp-python 必须单独提前安装，不要写在 requirements.txt
 RUN pip3 install \
     --no-cache-dir \
     --prefer-binary \
-    --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121 \
-    llama-cpp-python
-
+    --extra-index-url https://pip.pypa.io/simple/ \
+    "llama-cpp-python[server,cuda]"
 WORKDIR /app
-
 COPY requirements.txt /app/requirements.txt
 RUN python3 -m pip install --no-cache-dir -r /app/requirements.txt
 
-# ===============================
-# Stage 3: 最终运行镜像
-# ===============================
-FROM deps AS final
-
+# 创建最终阶段
+FROM base as final
 WORKDIR /app
-
-# ★★★★ 关键点！拷贝 dist-packages 而不是 site-packages ★★★★
 COPY --from=deps /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
-
-# 复制应用代码（你的 app 下已经包含 protos 目录，无需单独 COPY protos）
 COPY app /app/app
 
+# --- gRPC 文件生成 ---
 WORKDIR /app/app
-
-# 生成 gRPC 代码（proto 文件在 app/protos 目录下）
 RUN python3 -m grpc_tools.protoc \
     -I=protos \
     --python_out=. \
     --grpc_python_out=. \
     protos/inference.proto
 
+# 【关键修复】将工作目录切换回 /app
 WORKDIR /app
 
-CMD ["python3", "-u", "app/main.py"]
+# 【关键修复】将 app 目录添加到 PYTHONPATH
+# 这会告诉 Python 在导入模块时也要搜索 /app/app 目录
+ENV PYTHONPATH "${PYTHONPATH}:/app/app"
+
+# 暴露端口
+EXPOSE 50051
+
+# 容器启动时运行的命令
+CMD ["python3", "/app/app/main.py"]
