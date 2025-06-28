@@ -1,10 +1,13 @@
+# E:\knowledge-base-app\backend\app\core\grpc_client.py
+
 import grpc
-from ..protos import inference_pb2, inference_pb2_grpc
-from ..core.settings import settings
+from app.protos import inference_pb2, inference_pb2_grpc    # ✅ 修正 imports
+from app.core.settings import settings                     # ✅ 修正 settings 导入
 import logging
 from typing import List
 
 logger = logging.getLogger(__name__)
+
 
 class GrpcClientManager:
     def __init__(self):

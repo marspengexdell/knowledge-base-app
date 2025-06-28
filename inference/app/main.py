@@ -1,21 +1,18 @@
+# E:\knowledge-base-app\inference\app\main.py
+
 import grpc
 from concurrent import futures
 from llama_cpp import Llama
-from sentence_transformers import SentenceTransformer # 【新增】导入嵌入模型库
-import protos.inference_pb2 as inference_pb2
-import protos.inference_pb2_grpc as inference_pb2_grpc
+from sentence_transformers import SentenceTransformer
+from app.protos import inference_pb2, inference_pb2_grpc    # ✅ 修正 imports
 from grpc_reflection.v1alpha import reflection
-import os
-import logging
-import threading
-import time
-from utils import IS_GPU_AVAILABLE
+import os, logging, threading, time
+from app.utils import IS_GPU_AVAILABLE                    # ✅ 修正 utils 导入
 from enum import Enum
 
-# ... (日志配置和常量) ...
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(threadName)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s %(threadName)s %(name)s %(levelname)s %(message)s'
 )
 logger = logging.getLogger(__name__)
 MODELS_PATH = "/models/"
