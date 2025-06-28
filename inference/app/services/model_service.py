@@ -4,11 +4,10 @@ from llama_cpp import Llama
 from sentence_transformers import SentenceTransformer
 from .utils import get_chat_handler
 from typing import Optional
+from app.config import MAX_TOKENS, EARLY_STOP_TOKENS, USE_KV_CACHE
 
 DEFAULT_MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "150"))
 STOP_TOKEN = os.getenv("STOP_TOKEN")
-
-USE_CACHE = os.getenv("LLAMA_USE_CACHE", "1").lower() not in ("0", "false", "no")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -133,19 +132,15 @@ class RAGService:
             return
 
         # 优先chat_handler，若没有chat模板，自动降级到基础 completion
+        limit = MAX_TOKENS if max_new_tokens is None else min(MAX_TOKENS, max_new_tokens)
         if not self.chat_handler:
             try:
                 stream = self.generation_model(
                     prompt=prompt,
-
-                    max_tokens=4096,
                     stream=True,
-                    use_cache=USE_CACHE,
-
-                    max_tokens=max_new_tokens,
-                    early_stopping=True,
-                    stream=True
-
+                    use_cache=USE_KV_CACHE,
+                    max_tokens=limit,
+                    stop=EARLY_STOP_TOKENS or None,
                 )
                 for output in stream:
                     token = output["choices"][0].get("text", "")
@@ -167,15 +162,9 @@ class RAGService:
             stream = self.generation_model(
                 prompt=final_prompt,
                 stop=stop_sequences,
-
-                max_tokens=4096,
                 stream=True,
-                use_cache=USE_CACHE,
-
-                max_tokens=max_new_tokens,
-                early_stopping=True,
-                stream=True
-
+                use_cache=USE_KV_CACHE,
+                max_tokens=limit,
             )
             for output in stream:
                 token = output["choices"][0].get("text", "")

@@ -55,7 +55,7 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
       - LLAMA_CUBLAS=1
-      - LLAMA_USE_CACHE=1
+      - USE_KV_CACHE=1
     gpus: all
     deploy:
       resources:
