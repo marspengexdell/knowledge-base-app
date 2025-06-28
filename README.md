@@ -168,3 +168,42 @@ After editing `inference.proto` or code under `inference/app`, rebuild the `infe
 docker compose build inference    # add --no-cache if necessary
 docker compose up -d
 ```
+
+## Tuning Generation
+
+The inference container exposes a few environment variables that control how text
+is generated. Adjust these values in `docker-compose.yml` under the
+`inference` service.
+
+### Maximum generation length
+
+Set `MAX_TOKENS` to limit the number of tokens returned for a single request.
+The default is `4096`.
+
+```yaml
+  inference:
+    environment:
+      - MAX_TOKENS=2048
+```
+
+### Early stopping tokens
+
+Provide a comma‑separated list via `EARLY_STOP_TOKENS` to stop generation when
+any of the tokens appear in the output.
+
+```yaml
+  inference:
+    environment:
+      - EARLY_STOP_TOKENS=<|eot|>,<|endoftext|>
+```
+
+### Key‑value cache
+
+The `USE_KV_CACHE` variable toggles the model’s KV cache. Set it to `0` to
+disable caching or `1` to enable it (the default).
+
+```yaml
+  inference:
+    environment:
+      - USE_KV_CACHE=0
+```
