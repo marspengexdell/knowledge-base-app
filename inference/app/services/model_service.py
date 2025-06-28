@@ -3,6 +3,10 @@ import logging
 from llama_cpp import Llama
 from sentence_transformers import SentenceTransformer
 from .utils import get_chat_handler
+from typing import Optional
+
+DEFAULT_MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "150"))
+STOP_TOKEN = os.getenv("STOP_TOKEN")
 
 USE_CACHE = os.getenv("LLAMA_USE_CACHE", "1").lower() not in ("0", "false", "no")
 
@@ -121,7 +125,9 @@ class RAGService:
         else:
             logging.warning("未找到任何嵌入模型，知识库检索功能将不可用。")
 
-    def generate_stream(self, prompt):
+    def generate_stream(self, prompt, max_new_tokens: Optional[int] = None):
+        if max_new_tokens is None:
+            max_new_tokens = DEFAULT_MAX_NEW_TOKENS
         if not self.generation_model:
             yield "模型未加载，请检查服务端日志。"
             return
@@ -131,13 +137,22 @@ class RAGService:
             try:
                 stream = self.generation_model(
                     prompt=prompt,
+
                     max_tokens=4096,
                     stream=True,
                     use_cache=USE_CACHE,
+
+                    max_tokens=max_new_tokens,
+                    early_stopping=True,
+                    stream=True
+
                 )
                 for output in stream:
                     token = output["choices"][0].get("text", "")
                     if token:
+                        if STOP_TOKEN and STOP_TOKEN in token:
+                            yield token.split(STOP_TOKEN)[0]
+                            break
                         yield token
             except Exception as e:
                 logging.error(f"文本生成时遇到错误: {e}", exc_info=True)
@@ -152,13 +167,22 @@ class RAGService:
             stream = self.generation_model(
                 prompt=final_prompt,
                 stop=stop_sequences,
+
                 max_tokens=4096,
                 stream=True,
                 use_cache=USE_CACHE,
+
+                max_tokens=max_new_tokens,
+                early_stopping=True,
+                stream=True
+
             )
             for output in stream:
                 token = output["choices"][0].get("text", "")
                 if token:
+                    if STOP_TOKEN and STOP_TOKEN in token:
+                        yield token.split(STOP_TOKEN)[0]
+                        break
                     yield token
         except Exception as e:
             logging.error(f"文本生成时遇到错误: {e}", exc_info=True)
