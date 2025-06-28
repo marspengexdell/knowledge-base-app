@@ -10,27 +10,30 @@ RUN apt-get update && apt-get install -y \
 
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /app/requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
 COPY app /app/app
 
-RUN touch /app/app/__init__.py && touch /app/app/protos/__init__.py
-
 WORKDIR /app/app
+RUN touch __init__.py protos/__init__.py
 
+# 生成 gRPC protobuf 绑定
 RUN python -m grpc_tools.protoc \
     -I=protos \
     --python_out=. \
     --grpc_python_out=. \
     protos/inference.proto
-RUN dos2unix protos/*.py
-RUN sed -i 's/^import[[:space:]]\+inference_pb2[[:space:]]\+as[[:space:]]\+inference__pb2/from . import inference_pb2 as inference__pb2/' protos/inference_pb2_grpc.py
 
-# 必须和 Python 一致
-RUN mkdir -p /app/app/knowledge_base_docs && chmod -R 777 /app/app/knowledge_base_docs
+# 统一行结束符
+RUN dos2unix inference_pb2.py inference_pb2_grpc.py
+
+# 修复 import 路径，确保引用相对
+RUN sed -i \
+    's/^import inference_pb2 as inference__pb2$/from . import inference_pb2 as inference__pb2/' \
+    inference_pb2_grpc.py
 
 WORKDIR /app
+RUN mkdir -p knowledge_base_storage && chmod -R 777 knowledge_base_storage
 
 EXPOSE 8000
-
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

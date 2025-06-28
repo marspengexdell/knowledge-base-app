@@ -1,6 +1,7 @@
 import grpc
 from concurrent import futures
 from llama_cpp import Llama
+from sentence_transformers import SentenceTransformer # 【新增】导入嵌入模型库
 import protos.inference_pb2 as inference_pb2
 import protos.inference_pb2_grpc as inference_pb2_grpc
 from grpc_reflection.v1alpha import reflection
@@ -11,14 +12,15 @@ import time
 from utils import IS_GPU_AVAILABLE
 from enum import Enum
 
+# ... (日志配置和常量) ...
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(threadName)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
 MODELS_PATH = "/models/"
 
+# ... (ModelStatus, detect_model_type, build_prompt_qwen 等辅助函数保持不变) ...
 class ModelStatus(Enum):
     IDLE = "IDLE"
     LOADING = "LOADING"
@@ -26,36 +28,23 @@ class ModelStatus(Enum):
     ERROR = "ERROR"
 
 def detect_model_type(model_name, loaded_model=None):
-    """
-    根据文件名和模型元数据，自动判别模型类型
-    """
     lower = model_name.lower()
-    if "qwen" in lower:
-        return "qwen"
-    elif "yi" in lower:
-        return "yi"
-    elif "baichuan" in lower:
-        return "baichuan"
-    elif "deepseek" in lower:
-        return "deepseek"
-    elif "llama-3" in lower:
-        return "llama-3"
-    elif "llama-2" in lower:
-        return "llama-2"
+    if "qwen" in lower: return "qwen"
+    elif "yi" in lower: return "yi"
+    elif "baichuan" in lower: return "baichuan"
+    elif "deepseek" in lower: return "deepseek"
+    elif "llama-3" in lower: return "llama-3"
+    elif "llama-2" in lower: return "llama-2"
     elif loaded_model and hasattr(loaded_model, "chat_format"):
         cf = getattr(loaded_model, "chat_format")
-        if isinstance(cf, str):
-            return cf.lower()
+        if isinstance(cf, str): return cf.lower()
     return "llama"
 
 def build_prompt_qwen(messages):
-    """Qwen/Yi/部分国产模型需要手动拼prompt"""
     prompt = ""
     for msg in messages:
-        if msg['role'] == 'user':
-            prompt += "<|im_start|>user\n" + msg['content'] + "<|im_end|>\n"
-        elif msg['role'] == 'assistant':
-            prompt += "<|im_start|>assistant\n" + msg['content'] + "<|im_end|>\n"
+        if msg['role'] == 'user': prompt += "<|im_start|>user\n" + msg['content'] + "<|im_end|>\n"
+        elif msg['role'] == 'assistant': prompt += "<|im_start|>assistant\n" + msg['content'] + "<|im_end|>\n"
     prompt += "<|im_start|>assistant\n"
     return prompt
 
@@ -73,16 +62,23 @@ class ModelManager:
     def __init__(self):
         if self.initialized:
             return
+        # LLM 相关
         self.model = None
         self.model_name = ""
-        self.model_type = None  # 新增，模型类型
+        self.model_type = None
         self.status = ModelStatus.IDLE
         self.error_message = ""
+        # 【新增】Embedding Model 相关
+        self.embedding_model = None
+        self.embedding_model_name = ""
+        # 通用
         self.lock = threading.Lock()
         self.initialized = True
         logger.info("模型管理器初始化完成。")
 
+    # ... (_load_model_in_background 保持不变) ...
     def _load_model_in_background(self, new_model_name):
+        # (此函数内容保持不变)
         try:
             with self.lock:
                 if self.model is not None:
@@ -93,28 +89,15 @@ class ModelManager:
                 self.status = ModelStatus.LOADING
                 self.error_message = ""
                 self.model_type = None
-
             model_path = os.path.join(MODELS_PATH, new_model_name)
             n_gpu_layers = -1 if IS_GPU_AVAILABLE else 0
             device = "GPU" if IS_GPU_AVAILABLE else "CPU"
-
             logger.info(f"将使用 {device} 加载模型: {new_model_name} (n_gpu_layers={n_gpu_layers})")
-            # 对部分模型可预传chat_format参数，但不影响大多数类型
             chat_format_to_use = None
-            if "qwen" in new_model_name.lower():
-                chat_format_to_use = "chatml"
-            elif "llama-3" in new_model_name.lower():
-                chat_format_to_use = "llama-3"
-            elif "llama-2" in new_model_name.lower():
-                chat_format_to_use = "llama-2"
-
-            new_model = Llama(
-                model_path=model_path,
-                n_ctx=4096,
-                n_gpu_layers=n_gpu_layers,
-                chat_format=chat_format_to_use,
-                verbose=True
-            )
+            if "qwen" in new_model_name.lower(): chat_format_to_use = "chatml"
+            elif "llama-3" in new_model_name.lower(): chat_format_to_use = "llama-3"
+            elif "llama-2" in new_model_name.lower(): chat_format_to_use = "llama-2"
+            new_model = Llama(model_path=model_path, n_ctx=8192, n_gpu_layers=n_gpu_layers, chat_format=chat_format_to_use, verbose=True) # 增加n_ctx
             with self.lock:
                 self.model = new_model
                 self.model_type = detect_model_type(new_model_name, new_model)
@@ -127,109 +110,87 @@ class ModelManager:
                 self.model_type = None
                 self.status = ModelStatus.ERROR
                 self.error_message = str(e)
+    
+    # 【新增】加载嵌入模型的私有方法
+    def _load_embedding_model(self):
+        try:
+            # 默认加载中文bge模型，或者可以从配置中读取
+            embed_model_path = os.path.join(MODELS_PATH, "embedding-model", "BAAI/bge-base-zh-v1.5")
+            if not os.path.isdir(embed_model_path):
+                 embed_model_path = "BAAI/bge-base-zh-v1.5" # 如果本地没有，从HuggingFace下载
+            
+            logger.info(f"正在加载嵌入模型: {embed_model_path}...")
+            device = "cuda" if IS_GPU_AVAILABLE else "cpu"
+            self.embedding_model = SentenceTransformer(embed_model_path, device=device)
+            self.embedding_model_name = "BAAI/bge-base-zh-v1.5"
+            logger.info("***** 成功加载嵌入模型 *****")
+        except Exception as e:
+            logger.error(f"加载嵌入模型时发生错误: {e}", exc_info=True)
 
+    # ... (switch_model, get_model_instance, etc. 保持不变) ...
     def switch_model(self, new_model_name):
         with self.lock:
-            if self.status == ModelStatus.LOADING:
-                return {"status": "loading_busy"}
-            if self.model_name == new_model_name and self.status == ModelStatus.READY:
-                return {"status": "already_loaded"}
+            if self.status == ModelStatus.LOADING: return {"status": "loading_busy"}
+            if self.model_name == new_model_name and self.status == ModelStatus.READY: return {"status": "already_loaded"}
             model_path = os.path.join(MODELS_PATH, new_model_name)
-            if not os.path.exists(model_path):
-                return {"status": "error", "message": "模型文件不存在"}
+            if not os.path.exists(model_path): return {"status": "error", "message": "模型文件不存在"}
             thread = threading.Thread(target=self._load_model_in_background, args=(new_model_name,), name=f"ModelLoader-{new_model_name}")
             thread.daemon = True
             thread.start()
             return {"status": "loading_started", "name": new_model_name}
 
     def get_model_instance(self):
-        if self.status == ModelStatus.READY:
-            return self.model
+        if self.status == ModelStatus.READY: return self.model
         return None
 
     def get_model_type(self):
-        if self.status == ModelStatus.READY:
-            return self.model_type
+        if self.status == ModelStatus.READY: return self.model_type
         return None
 
     def get_current_status(self):
-        return {
-            "status": self.status.name,
-            "model_name": self.model_name,
-            "model_type": self.model_type,
-            "error_message": self.error_message
-        }
+        return {"status": self.status.name, "model_name": self.model_name, "model_type": self.model_type, "error_message": self.error_message}
 
     def infer_stream(self, query, history=None):
-        """
-        通用推理流，自动适配不同模型类型
-        query: 用户输入字符串
-        history: 聊天历史 [{"role":"user","content":""},{"role":"assistant","content":""}]
-        """
-        if self.status != ModelStatus.READY or not self.model:
-            raise RuntimeError("模型未就绪")
+        if self.status != ModelStatus.READY or not self.model: raise RuntimeError("模型未就绪")
         messages = []
-        if history:
-            messages += history
+        if history: messages += history
         messages.append({"role": "user", "content": query})
-
-        # Qwen、Yi等需要拼prompt
         if self.model_type in ("qwen", "yi"):
             prompt = build_prompt_qwen(messages)
             for output in self.model.create_completion(prompt=prompt, stream=True):
                 token = output["choices"][0].get("text", "")
-                if token:
-                    yield token
+                if token: yield token
         else:
             for output in self.model.create_chat_completion(messages=messages, stream=True):
                 token = output["choices"][0].get("delta", {}).get("content", "")
-                if not token:
-                    # 兼容部分模型直接用text字段
-                    token = output["choices"][0].get("text", "")
-                if token:
-                    yield token
+                if not token: token = output["choices"][0].get("text", "")
+                if token: yield token
 
 model_manager = ModelManager()
 
 class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
+    # ... (ListAvailableModels, SwitchModel, ChatStream 保持不变) ...
     def ListAvailableModels(self, request, context):
         generation_models = []
         embedding_models = []
-
-        # 扫描主模型目录
         try:
             for f in os.listdir(MODELS_PATH):
                 path = os.path.join(MODELS_PATH, f)
                 if f.endswith('.gguf'):
-                    if "embed" in f.lower() or "embedding" in f.lower():
-                        embedding_models.append(f)
-                    else:
-                        generation_models.append(f)
+                    if "embed" in f.lower() or "embedding" in f.lower(): embedding_models.append(f)
+                    else: generation_models.append(f)
         except FileNotFoundError:
             logger.warning(f"主模型目录 {MODELS_PATH} 未找到。")
-
-        # 扫描嵌入模型专用目录，兼容 huggingface 结构和 .safetensors/.gguf 文件
         embed_dir = os.path.join(MODELS_PATH, "embedding-model")
         if os.path.isdir(embed_dir):
             for sub in os.listdir(embed_dir):
                 sub_path = os.path.join(embed_dir, sub)
-                if os.path.isdir(sub_path):
-                    # huggingface 目录模式
-                    embedding_models.append(os.path.join("embedding-model", sub))
-                elif sub.endswith('.gguf') or sub.endswith('.safetensors'):
-                    embedding_models.append(os.path.join("embedding-model", sub))
-
+                if os.path.isdir(sub_path): embedding_models.append(os.path.join("embedding-model", sub))
+                elif sub.endswith('.gguf') or sub.endswith('.safetensors'): embedding_models.append(os.path.join("embedding-model", sub))
         current_generation_model = model_manager.model_name if model_manager.status in [ModelStatus.READY, ModelStatus.LOADING] else ""
-        current_embedding_model = embedding_models[0] if embedding_models else ""
+        current_embedding_model = model_manager.embedding_model_name or (embedding_models[0] if embedding_models else "")
         device = "GPU" if IS_GPU_AVAILABLE else "CPU"
-
-        return inference_pb2.ModelListResponse(
-            generation_models=generation_models,
-            embedding_models=embedding_models,
-            current_generation_model=current_generation_model,
-            current_embedding_model=current_embedding_model,
-            device=device
-        )
+        return inference_pb2.ModelListResponse(generation_models=generation_models, embedding_models=embedding_models, current_generation_model=current_generation_model, current_embedding_model=current_embedding_model, device=device)
 
     def SwitchModel(self, request, context):
         result = model_manager.switch_model(request.model_name)
@@ -244,6 +205,33 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
         except Exception as e:
             logger.error(f"聊天生成过程中出错: {e}", exc_info=True)
             yield inference_pb2.ChatResponse(error_message=f"[SYSTEM-ERROR] Inference error: {e}")
+            
+    # 【新增】实现批量嵌入的具体逻辑
+    def GetEmbeddingsBatch(self, request, context):
+        if not model_manager.embedding_model:
+            logger.error("嵌入模型未加载，无法处理批量嵌入请求。")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details("Embedding model is not ready.")
+            return inference_pb2.EmbeddingBatchResponse()
+        
+        logger.info(f"正在为 {len(request.texts)} 条文本批量生成嵌入...")
+        try:
+            vectors = model_manager.embedding_model.encode(
+                request.texts,
+                normalize_embeddings=True
+            )
+            response_embeddings = []
+            for vec in vectors:
+                embedding_msg = inference_pb2.Embedding(values=vec.tolist())
+                response_embeddings.append(embedding_msg)
+            
+            return inference_pb2.EmbeddingBatchResponse(embeddings=response_embeddings)
+        except Exception as e:
+            logger.error(f"批量嵌入时发生错误: {e}", exc_info=True)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(f"Internal error during batch embedding: {str(e)}")
+            return inference_pb2.EmbeddingBatchResponse()
+
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -254,12 +242,16 @@ def serve():
     server.start()
     logger.info("***** gRPC 服务器已成功启动，正在监听端口 50051 *****")
 
+    # 【新增】在启动时就加载嵌入模型
+    model_manager._load_embedding_model()
+
+    # 自动加载第一个LLM
     try:
-        available_models = sorted([f for f in os.listdir(MODELS_PATH) if f.endswith('.gguf')])
+        available_models = sorted([f for f in os.listdir(MODELS_PATH) if f.endswith('.gguf') and "embed" not in f.lower()])
         if available_models:
             model_manager.switch_model(available_models[0])
         else:
-            logger.warning(f"在 {MODELS_PATH} 目录下未找到任何 .gguf 模型文件。")
+            logger.warning(f"在 {MODELS_PATH} 目录下未找到任何 .gguf 生成模型文件。")
     except FileNotFoundError:
         logger.error(f"模型目录 {MODELS_PATH} 不存在。")
 

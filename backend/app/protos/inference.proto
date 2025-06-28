@@ -2,18 +2,18 @@ syntax = "proto3";
 
 package inference;
 
-
 service InferenceService {
     rpc ChatStream (ChatRequest) returns (stream ChatResponse);
     rpc ListAvailableModels (Empty) returns (ModelListResponse);
     rpc SwitchModel (SwitchModelRequest) returns (SwitchModelResponse);
+    rpc GetEmbeddingsBatch(EmbeddingBatchRequest) returns (EmbeddingBatchResponse);
 }
 
-message Empty {}
 
+message Empty {}
 message ChatRequest {
     string query = 1;
-    string session_id = 2;
+    string session_id = 2; 
 }
 
 message ChatResponse {
@@ -22,6 +22,18 @@ message ChatResponse {
         string error_message = 2;
         string source_document = 3;
     }
+}
+
+message Embedding {
+    repeated float values = 1;
+}
+
+message EmbeddingBatchRequest {
+    repeated string texts = 1;
+}
+
+message EmbeddingBatchResponse {
+    repeated Embedding embeddings = 1;
 }
 
 message ModelListResponse {
