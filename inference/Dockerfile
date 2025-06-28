@@ -1,5 +1,3 @@
-# E:\knowledge-base-app\inference\Dockerfile
-
 # 基础镜像：CUDA + Python + 工具
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04 AS base
 RUN apt-get update && apt-get install -y \
