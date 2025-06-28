@@ -15,6 +15,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 MODELS_PATH = "/models/"
+USE_CACHE = os.getenv("LLAMA_USE_CACHE", "1").lower() not in ("0", "false", "no")
 
 class ModelStatus(Enum):
     IDLE = "IDLE"
@@ -130,6 +131,21 @@ class ModelManager:
         last_idx = 0
         if self.model_type in ("qwen", "yi"):
             prompt = build_prompt_qwen(messages)
+
+            yield from (
+                o["choices"][0].get("text", "")
+                for o in self.model.create_completion(
+                    prompt=prompt, stream=True, use_cache=USE_CACHE
+                )
+            )
+        else:
+            yield from (
+                o["choices"][0].get("delta", {}).get("content", "")
+                for o in self.model.create_chat_completion(
+                    messages=messages, stream=True, use_cache=USE_CACHE
+                )
+            )
+
             stream = self.model.create_completion(prompt=prompt, stream=True)
             for output in stream:
                 token = output["choices"][0].get("text", "")
@@ -159,6 +175,7 @@ class ModelManager:
                 if len(generated) > last_idx:
                     yield generated[last_idx:]
                     last_idx = len(generated)
+
 
 model_manager = ModelManager()
 
