@@ -51,7 +51,6 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./models:/models:rw
-      - ./inference/app/model_config.json:/app/model_config.json:ro
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
