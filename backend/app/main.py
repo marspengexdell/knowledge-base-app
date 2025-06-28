@@ -6,6 +6,7 @@ from .api.endpoints.embedding import router as embedding_router
 from .core.grpc_client import grpc_client_manager
 import logging
 import asyncio
+from .api.endpoints.knowledge import router as knowledge_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ async def shutdown_event():
 app.include_router(chat_router, prefix="/api/chat", tags=["Chat"])
 app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 app.include_router(embedding_router, prefix="/api/embedding", tags=["Embedding"])
+app.include_router(knowledge_router, prefix="/api/admin/knowledge")
 
 @app.get("/")
 def read_root():
