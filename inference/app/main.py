@@ -7,6 +7,7 @@ import app.protos.inference_pb2_grpc as inference_pb2_grpc
 from grpc_reflection.v1alpha import reflection
 import os, logging, threading, time
 from app.utils import IS_GPU_AVAILABLE
+from app.config import MAX_TOKENS, EARLY_STOP_TOKENS, USE_KV_CACHE
 from enum import Enum
 
 logging.basicConfig(
@@ -15,7 +16,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 MODELS_PATH = "/models/"
-USE_CACHE = os.getenv("LLAMA_USE_CACHE", "1").lower() not in ("0", "false", "no")
+
 
 class ModelStatus(Enum):
     IDLE = "IDLE"
@@ -126,55 +127,32 @@ class ModelManager:
             raise RuntimeError("模型未就绪")
         messages = history[:] if history else []
         messages.append({"role": "user", "content": query})
-        end_token = "<END>"
-        generated = ""
-        last_idx = 0
+
         if self.model_type in ("qwen", "yi"):
             prompt = build_prompt_qwen(messages)
-
-            yield from (
-                o["choices"][0].get("text", "")
-                for o in self.model.create_completion(
-                    prompt=prompt, stream=True, use_cache=USE_CACHE
-                )
+            stream = self.model.create_completion(
+                prompt=prompt,
+                stream=True,
+                use_cache=USE_KV_CACHE,
+                max_tokens=MAX_TOKENS,
+                stop=EARLY_STOP_TOKENS or None,
             )
-        else:
-            yield from (
-                o["choices"][0].get("delta", {}).get("content", "")
-                for o in self.model.create_chat_completion(
-                    messages=messages, stream=True, use_cache=USE_CACHE
-                )
-            )
-
-            stream = self.model.create_completion(prompt=prompt, stream=True)
             for output in stream:
                 token = output["choices"][0].get("text", "")
-                if not token:
-                    continue
-                generated += token
-                if end_token in generated:
-                    stop = generated.index(end_token)
-                    if stop > last_idx:
-                        yield generated[last_idx:stop]
-                    break
-                if len(generated) > last_idx:
-                    yield generated[last_idx:]
-                    last_idx = len(generated)
+                if token:
+                    yield token
         else:
-            stream = self.model.create_chat_completion(messages=messages, stream=True)
+            stream = self.model.create_chat_completion(
+                messages=messages,
+                stream=True,
+                use_cache=USE_KV_CACHE,
+                max_tokens=MAX_TOKENS,
+                stop=EARLY_STOP_TOKENS or None,
+            )
             for output in stream:
                 token = output["choices"][0].get("delta", {}).get("content", "")
-                if not token:
-                    continue
-                generated += token
-                if end_token in generated:
-                    stop = generated.index(end_token)
-                    if stop > last_idx:
-                        yield generated[last_idx:stop]
-                    break
-                if len(generated) > last_idx:
-                    yield generated[last_idx:]
-                    last_idx = len(generated)
+                if token:
+                    yield token
 
 
 model_manager = ModelManager()
