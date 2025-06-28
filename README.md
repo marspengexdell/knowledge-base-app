@@ -140,7 +140,7 @@ that directory before rebuilding the containers.
 
 The inference service now enables key/value caching when generating text. This
 improves throughput but increases memory usage. Set the environment variable
-`LLAMA_USE_CACHE=0` when starting the container to disable caching if your
+`USE_KV_CACHE=0` when starting the container to disable caching if your
 system has limited RAM.
 ### Regenerating gRPC Stubs
 
