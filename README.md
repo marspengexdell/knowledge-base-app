@@ -208,7 +208,43 @@ disable caching or `1` to enable it (the default).
       - USE_KV_CACHE=0
 ```
 
+## Deploying with Nginx
+
+The project ships with an optional Nginx reverse proxy configuration located
+under `nginx/`. It routes incoming HTTPS traffic to the backend API and the two
+Vue frontends while Certbot manages the TLS certificates.
+
+### Obtaining certificates
+
+Edit `nginx/nginx.conf` and replace the example domain names with your own.
+Create the certificate volumes and run Certbot once to generate the initial
+certificates:
+
+```bash
+docker volume create certbot-etc
+docker volume create certbot-web
+docker compose run --rm certbot certonly --webroot \
+  --webroot-path=/var/www/certbot \
+  -d example.com -d api.example.com -d admin.example.com \
+  --email you@example.com --agree-tos --no-eff-email
+```
+
+The certificates reside in the `certbot-etc` volume. The `certbot` service runs
+`certbot renew` every 12&nbsp;hours to keep them up to date.
+
+### Starting the stack
+
+Start all containers, including Nginx, with:
+
+```bash
+docker compose up --build
+```
+
+Nginx exposes ports `80` and `443` while the individual services communicate
+through the internal Docker network.
+=======
 ## Disclaimer
 
 Generated responses may be inaccurate or inappropriate. Use this application
 ethically and avoid uploading any sensitive or confidential information.
+
