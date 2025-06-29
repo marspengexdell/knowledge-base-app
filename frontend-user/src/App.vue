@@ -1,262 +1,216 @@
 <template>
-  <div id="chat-container">
-    <div class="header">
-      <h1>AI 知识库</h1>
-      <div class="status">
-        <span :class="['status-light', connectionStatus.class]"></span>
-        <span>{{ connectionStatus.text }}</span>
-      </div>
-    </div>
+  <div class="flex flex-col h-screen w-screen bg-neutral-95 font-sans">
+    
+    <header class="flex-shrink-0 bg-neutral-100 border-b border-neutral-80 flex items-center px-6 h-16 shadow-sm">
+      <h1 class="text-xl font-semibold text-neutral-10">企业智能知识库</h1>
+    </header>
 
-    <div id="chat-window" ref="chatWindow">
-      <div v-for="message in messages" :key="message.id" :class="['message-row', message.role]">
-        <div class="message-bubble">
-          <div class="content" v-html="renderMarkdown(message.content)"></div>
+    <main class="flex-1 flex flex-col overflow-hidden">
+      <div id="chat-container" ref="chatContainer" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+        
+        <div class="flex items-start space-x-3">
+          <div class="flex-shrink-0 h-10 w-10 rounded-full bg-salesforce-blue flex items-center justify-center text-white">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+          </div>
+          <div class="bg-neutral-100 p-4 rounded-lg rounded-tl-none max-w-xl shadow-sm border border-neutral-80">
+            <p class="text-sm text-neutral-10">您好！我是您的智能售后助手，请问有什么可以帮您？</p>
+          </div>
         </div>
-      </div>
-    </div>
 
-    <div id="chat-input-area">
-      <textarea
-        v-model="userInput"
-        @keydown.enter.prevent="sendMessage"
-        placeholder="请输入您的问题..."
-        :disabled="isGenerating"
-      ></textarea>
-      <button @click="sendMessage" :disabled="!userInput.trim() || isGenerating">
-        {{ isGenerating ? '思考中...' : '发送' }}
-      </button>
-    </div>
+        <div v-for="msg in messages" :key="msg.id" class="flex" :class="msg.role === 'user' ? 'justify-end' : 'items-start'">
+          
+          <div v-if="msg.role === 'assistant'" class="flex items-start space-x-3">
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-salesforce-blue flex items-center justify-center text-white">
+              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            </div>
+            <div class="bg-neutral-100 p-4 rounded-lg rounded-tl-none max-w-xl shadow-sm border border-neutral-80">
+              <div v-html="renderMarkdown(msg.content)" class="prose prose-sm max-w-none"></div>
+              
+              <div v-if="msg.sources && msg.sources.length > 0" class="mt-4 border-t border-neutral-80 pt-3">
+                <h4 class="text-xs font-semibold text-neutral-50 mb-2">引用来源:</h4>
+                <div class="space-y-2">
+                  <div v-for="(source, index) in msg.sources" :key="index" class="bg-neutral-95/50 p-3 rounded-md text-xs text-neutral-10">
+                    <p class="font-medium truncate"><strong>{{ source.metadata.source }}</strong></p>
+                    <p class="mt-1 text-neutral-50">{{ source.page_content }}</p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          
+          <div v-if="msg.role === 'user'" class="bg-salesforce-blue text-white p-4 rounded-lg rounded-br-none max-w-xl shadow-sm">
+            <p class="text-sm">{{ msg.content }}</p>
+          </div>
+
+        </div>
+
+        <div v-if="isGenerating" class="flex items-start space-x-3">
+          <div class="flex-shrink-0 h-10 w-10 rounded-full bg-salesforce-blue flex items-center justify-center text-white">
+             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+          </div>
+          <div class="bg-neutral-100 p-4 rounded-lg rounded-tl-none max-w-xl shadow-sm border border-neutral-80 flex items-center space-x-2">
+            <span class="h-2 w-2 bg-salesforce-blue rounded-full animate-bounce delay-75"></span>
+            <span class="h-2 w-2 bg-salesforce-blue rounded-full animate-bounce delay-150"></span>
+            <span class="h-2 w-2 bg-salesforce-blue rounded-full animate-bounce delay-300"></span>
+          </div>
+        </div>
+
+      </div>
+
+      <footer class="flex-shrink-0 bg-neutral-100 border-t border-neutral-80 p-4">
+        <div class="flex items-center space-x-2">
+          <input
+            type="text"
+            v-model="userInput"
+            @keyup.enter="sendMessage"
+            placeholder="请输入您的问题..."
+            class="flex-1 w-full px-4 py-2 bg-white border border-neutral-80 rounded-md focus:ring-2 focus:ring-salesforce-blue focus:outline-none text-sm"
+            :disabled="isGenerating"
+          />
+          <button
+            @click="sendMessage"
+            class="bg-salesforce-blue text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-salesforce-blue-dark disabled:bg-neutral-50 disabled:cursor-not-allowed"
+            :disabled="!userInput.trim() || isGenerating"
+          >
+            发送
+          </button>
+        </div>
+      </footer>
+    </main>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
-import { marked } from 'marked';
-import { v4 as uuidv4 } from 'uuid';
+import { ref, nextTick, onMounted } from 'vue';
+import MarkdownIt from 'markdown-it';
 
-// --- Reactive State ---
-const messages = ref([
-  { id: uuidv4(), role: 'assistant', content: '您好！我是您的AI知识库助手，有什么可以帮助您的吗？' }
-]);
+// --- WebSocket 和数据状态管理 ---
+const socket = ref(null);
+const messages = ref([]);
 const userInput = ref('');
-const isConnected = ref(false);
 const isGenerating = ref(false);
-const chatWindow = ref(null);
 const sessionId = ref('');
-let socket = null;
+const chatContainer = ref(null);
 
-// --- WebSocket Logic ---
-const connectWebSocket = () => {
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsURL = `${wsProtocol}//${window.location.host}/api/chat/ws`;
+const md = new MarkdownIt(); // 初始化 Markdown 渲染器
+
+// --- WebSocket 连接 ---
+onMounted(() => {
+  // 注意：这里的 URL 可能需要根据你的反向代理配置进行调整
+  const wsUrl = `ws://${window.location.host}/api/chat/ws`;
+  socket.value = new WebSocket(wsUrl);
+
+  socket.value.onopen = () => console.log("WebSocket 连接成功");
+  socket.value.onerror = (error) => console.error("WebSocket 错误: ", error);
+  socket.value.onclose = () => console.log("WebSocket 连接已关闭");
   
-  socket = new WebSocket(wsURL);
-
-  socket.onopen = () => {
-    console.log("WebSocket connection established.");
-    isConnected.value = true;
-  };
-
-  socket.onmessage = (event) => {
+  socket.value.onmessage = (event) => {
     const data = JSON.parse(event.data);
-
-    if (data.session_id) {
-      sessionId.value = data.session_id;
-    }
+    if (data.session_id) sessionId.value = data.session_id;
 
     if (data.token) {
-      const lastMessage = messages.value[messages.value.length - 1];
-      if (lastMessage && lastMessage.role === 'assistant') {
-        if (lastMessage.content === '🤔 思考中...') {
-          lastMessage.content = data.token;
-        } else {
-          lastMessage.content += data.token;
-        }
-        scrollToBottom();
-      }
+      handleToken(data.token);
+    }
+    
+    if (data.sources) {
+      handleSources(data.sources);
     }
 
     if (data.event === '[DONE]') {
       isGenerating.value = false;
     }
   };
+});
 
-  socket.onclose = () => {
-    console.log("WebSocket connection closed.");
-    isConnected.value = false;
-    isGenerating.value = false;
-  };
+// --- 核心方法 ---
 
-  socket.onerror = (error) => {
-    console.error("WebSocket Error:", error);
-    isGenerating.value = false;
-    messages.value.push({
-      id: uuidv4(),
-      role: 'assistant',
-      content: '抱歉，连接出现问题，请刷新页面重试。'
-    });
-  };
-};
-
-// --- Message Handling ---
 const sendMessage = () => {
-  if (!userInput.value.trim() || !isConnected.value || isGenerating.value) return;
+  if (!userInput.value.trim() || isGenerating.value) return;
 
+  // 1. 将用户消息添加到列表
   messages.value.push({
-    id: uuidv4(),
+    id: Date.now(),
     role: 'user',
     content: userInput.value,
   });
 
+  // 2. 准备发送的数据
   const payload = {
     query: userInput.value,
-    session_id: sessionId.value
+    session_id: sessionId.value,
   };
-  socket.send(JSON.stringify(payload));
-  userInput.value = '';
-  isGenerating.value = true; // 开始生成
 
-  // 添加占位符
+  // 3. 发送数据并清空输入框
+  socket.value.send(JSON.stringify(payload));
+  userInput.value = '';
+  isGenerating.value = true;
+
+  // 4. 创建一个空的 AI 消息占位符
   messages.value.push({
-    id: uuidv4(),
+    id: Date.now() + 1,
     role: 'assistant',
-    content: '🤔 思考中...',
+    content: '',
+    sources: []
   });
-  
+
   scrollToBottom();
 };
 
-const renderMarkdown = (content) => {
-  return marked.parse(content);
+const handleToken = (token) => {
+  const lastMessage = messages.value[messages.value.length - 1];
+  if (lastMessage && lastMessage.role === 'assistant') {
+    lastMessage.content += token;
+    scrollToBottom();
+  }
 };
 
-// --- UI Utility ---
+const handleSources = (sources) => {
+  const lastMessage = messages.value[messages.value.length - 1];
+   if (lastMessage && lastMessage.role === 'assistant') {
+    lastMessage.sources = sources;
+    scrollToBottom();
+  }
+}
+
+const renderMarkdown = (content) => {
+  return md.render(content);
+};
+
 const scrollToBottom = () => {
   nextTick(() => {
-    if (chatWindow.value) {
-      chatWindow.value.scrollTop = chatWindow.value.scrollHeight;
+    if (chatContainer.value) {
+      chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
     }
   });
 };
 
-const connectionStatus = computed(() => {
-  return isConnected.value 
-    ? { text: '已连接', class: 'connected' }
-    : { text: '未连接', class: 'disconnected' };
-});
-
-// --- Lifecycle Hooks ---
-onMounted(() => connectWebSocket());
-onUnmounted(() => { if (socket) socket.close(); });
 </script>
 
 <style>
-/* 你的 CSS 样式保持不变 */
-#chat-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background-color: #2d2d2d;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+/* 为了让 Tailwind Prose 插件样式生效，需要引入它的基础样式 */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* 定制 Salesforce 风格的颜色 */
+@layer base {
+  :root {
+    --salesforce-blue: #0070D2;
+    --salesforce-blue-dark: #005FB2;
+    --neutral-100: #FFFFFF;
+    --neutral-95: #F3F3F3;
+    --neutral-80: #E0E0E0;
+    --neutral-50: #6B6B6B;
+    --neutral-10: #181818;
+  }
 }
-.header {
-  padding: 10px 20px;
-  background-color: #333;
-  border-bottom: 1px solid #444;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+
+.prose {
+  color: var(--neutral-10);
 }
-.header h1 {
-  font-size: 1.2em;
-  margin: 0;
+.prose a {
+  color: var(--salesforce-blue);
 }
-.status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9em;
-}
-.status-light {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-.status-light.connected { background-color: #4caf50; }
-.status-light.disconnected { background-color: #f44336; }
-#chat-window {
-  flex-grow: 1;
-  overflow-y: auto;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-.message-row {
-  display: flex;
-}
-.message-row.user {
-  justify-content: flex-end;
-}
-.message-row.assistant {
-  justify-content: flex-start;
-}
-.message-bubble {
-  max-width: 80%;
-  padding: 10px 15px;
-  border-radius: 18px;
-  line-height: 1.6;
-}
-.message-row.user .message-bubble {
-  background-color: #007bff;
-  color: white;
-  border-top-right-radius: 4px;
-}
-.message-row.assistant .message-bubble {
-  background-color: #444;
-  color: #f1f1f1;
-  border-top-left-radius: 4px;
-}
-.content p:first-child { margin-top: 0; }
-.content p:last-child { margin-bottom: 0; }
-.content pre {
-  background-color: #1e1e1e;
-  padding: 10px;
-  border-radius: 6px;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-.content code {
-  font-family: 'Courier New', Courier, monospace;
-}
-#chat-input-area {
-  display: flex;
-  padding: 15px;
-  border-top: 1px solid #444;
-  background-color: #333;
-}
-#chat-input-area textarea {
-  flex-grow: 1;
-  border-radius: 6px;
-  border: 1px solid #555;
-  background-color: #252525;
-  color: #f1f1f1;
-  padding: 10px;
-  resize: none;
-  font-family: inherit;
-  font-size: 1em;
-  margin-right: 10px;
-}
-#chat-input-area button {
-  background-color: #007bff;
-  color: white;
-  border: none;
-}
-#chat-input-area button:disabled {
-  background-color: #555;
-  cursor: not-allowed;
-}
+/* ... 更多 prose 样式定制 */
 </style>
