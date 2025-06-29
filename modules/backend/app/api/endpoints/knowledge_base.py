@@ -1,11 +1,11 @@
 from fastapi import APIRouter, HTTPException
-from typing import List, Dict
+from typing import List, Dict, Any
 
 from ...services.knowledge_base import kb_service
 
 router = APIRouter()
 
-@router.get("/documents", response_model=List[Dict[str, any]])
+@router.get("/documents", response_model=List[Dict[str, Any]])
 async def list_documents():
     """获取所有已上传的文档列表。"""
     documents = await kb_service.list_all_documents()
