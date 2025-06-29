@@ -3,8 +3,6 @@ services:
     build:
       context: ./modules/backend
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
     volumes:
       - ./modules/backend/app:/app/app
       - ./models:/models:ro
@@ -25,8 +23,6 @@ services:
     build:
       context: ./frontend-user
       dockerfile: Dockerfile
-    ports:
-      - "8080:80"
     depends_on:
       - backend
     networks:
@@ -36,8 +32,6 @@ services:
     build:
       context: ./frontend-admin
       dockerfile: Dockerfile
-    ports:
-      - "8081:80"
     volumes:
       - ./frontend-admin:/app
     depends_on:
@@ -82,8 +76,35 @@ services:
     networks:
       - app-network
 
+  nginx:
+    image: nginx:1.25
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/options-ssl-nginx.conf:/etc/nginx/options-ssl-nginx.conf:ro
+      - certbot-web:/var/www/certbot
+      - certbot-etc:/etc/letsencrypt
+    depends_on:
+      - backend
+      - frontend-user
+      - frontend-admin
+    networks:
+      - app-network
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-web:/var/www/certbot
+    entrypoint: >-
+      sh -c 'trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew; done'
+
 volumes:
   chroma-data:
+  certbot-etc:
+  certbot-web:
 
 networks:
   app-network:
