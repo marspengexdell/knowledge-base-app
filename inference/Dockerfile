@@ -19,7 +19,10 @@ COPY requirements.txt .
 # 升级 pip 并安装所有依赖
 # - CMAKE_ARGS 和 FORCE_CMAKE 用于确保 llama-cpp-python 编译时启用 GPU 支持
 # - --no-cache-dir 避免缓存，确保每次都全新安装
-RUN python3 -m pip install --upgrade pip \
+RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/libcuda.so \
+    && ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/libcuda.so.1 \
+    && export LD_LIBRARY_PATH="/usr/local/cuda/lib64/stubs:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" \
+    && python3 -m pip install --upgrade pip \
     && export CMAKE_ARGS="-DLLAMA_CUBLAS=on" \
     && export FORCE_CMAKE=1 \
     && pip install --no-cache-dir -r requirements.txt
