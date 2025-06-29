@@ -138,7 +138,7 @@ class RAGService:
                 stream = self.generation_model(
                     prompt=prompt,
                     stream=True,
-                    use_cache=USE_KV_CACHE,
+                    cache=USE_KV_CACHE,
                     max_tokens=limit,
                     stop=EARLY_STOP_TOKENS or None,
                 )
@@ -163,7 +163,7 @@ class RAGService:
                 prompt=final_prompt,
                 stop=stop_sequences,
                 stream=True,
-                use_cache=USE_KV_CACHE,
+                cache=USE_KV_CACHE,
                 max_tokens=limit,
             )
             for output in stream:
