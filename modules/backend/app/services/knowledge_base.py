@@ -113,6 +113,36 @@ class KnowledgeBaseService:
             pass
         return True
 
+    async def list_all_documents(self) -> List[dict]:
+        """列出知识库中所有唯一的文档来源(source)。"""
+        if collection is None:
+            logging.error("ChromaDB not connected.")
+            return []
+        try:
+            results = collection.get(include=["metadatas"])
+            unique_sources = {}
+            for metadata in results.get("metadatas", []):
+                source = metadata.get("source")
+                if source and source not in unique_sources:
+                    unique_sources[source] = {"id": source, "source": source}
+            logging.info(f"成功列出 {len(unique_sources)} 个独立文档源。")
+            return list(unique_sources.values())
+        except Exception as e:
+            logging.error(f"列出文档时出错: {e}", exc_info=True)
+            return []
+
+    async def delete_documents_by_source(self, source: str) -> bool:
+        """根据文档来源删除所有相关的文档片段。"""
+        if not source or collection is None:
+            return False
+        try:
+            collection.delete(where={"source": source})
+            logging.info(f"成功删除来源为 '{source}' 的所有文档。")
+            return True
+        except Exception as e:
+            logging.error(f"删除来源为 '{source}' 的文档时出错: {e}", exc_info=True)
+            return False
+
 # 注意：因为方法变成了异步，外部调用需要调整。
 # 单例实例保持不变
 kb_service = KnowledgeBaseService()
