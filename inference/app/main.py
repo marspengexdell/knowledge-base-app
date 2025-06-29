@@ -133,7 +133,7 @@ class ModelManager:
             stream = self.model.create_completion(
                 prompt=prompt,
                 stream=True,
-                use_cache=USE_KV_CACHE,
+                cache=USE_KV_CACHE,
                 max_tokens=MAX_TOKENS,
                 stop=EARLY_STOP_TOKENS or None,
             )
@@ -145,7 +145,7 @@ class ModelManager:
             stream = self.model.create_chat_completion(
                 messages=messages,
                 stream=True,
-                use_cache=USE_KV_CACHE,
+                cache=USE_KV_CACHE,
                 max_tokens=MAX_TOKENS,
                 stop=EARLY_STOP_TOKENS or None,
             )
