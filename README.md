@@ -140,7 +140,7 @@ that directory before rebuilding the containers.
 
 The inference service now enables key/value caching when generating text. This
 improves throughput but increases memory usage. Set the environment variable
-`USE_KV_CACHE=0` when starting the container to disable caching if your
+`ENABLE_CACHE=0` when starting the container to disable caching if your
 system has limited RAM.
 ### Regenerating gRPC Stubs
 
@@ -199,11 +199,11 @@ any of the tokens appear in the output.
 
 ### Key‑value cache
 
-The `USE_KV_CACHE` variable toggles the model’s KV cache. Set it to `0` to
+The `ENABLE_CACHE` variable toggles the model’s KV cache. Set it to `0` to
 disable caching or `1` to enable it (the default).
 
 ```yaml
   inference:
     environment:
-      - USE_KV_CACHE=0
+      - ENABLE_CACHE=0
 ```

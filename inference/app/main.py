@@ -7,7 +7,7 @@ import app.protos.inference_pb2_grpc as inference_pb2_grpc
 from grpc_reflection.v1alpha import reflection
 import os, logging, threading, time
 from app.utils import IS_GPU_AVAILABLE
-from app.config import MAX_TOKENS, EARLY_STOP_TOKENS, USE_KV_CACHE
+from app.config import MAX_TOKENS, EARLY_STOP_TOKENS, ENABLE_CACHE
 from enum import Enum
 
 logging.basicConfig(
@@ -133,7 +133,7 @@ class ModelManager:
             stream = self.model.create_completion(
                 prompt=prompt,
                 stream=True,
-                cache=USE_KV_CACHE,
+                cache=ENABLE_CACHE,
                 max_tokens=MAX_TOKENS,
                 stop=EARLY_STOP_TOKENS or None,
             )
@@ -145,7 +145,7 @@ class ModelManager:
             stream = self.model.create_chat_completion(
                 messages=messages,
                 stream=True,
-                cache=USE_KV_CACHE,
+                cache=ENABLE_CACHE,
                 max_tokens=MAX_TOKENS,
                 stop=EARLY_STOP_TOKENS or None,
             )
