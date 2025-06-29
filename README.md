@@ -207,3 +207,8 @@ disable caching or `1` to enable it (the default).
     environment:
       - USE_KV_CACHE=0
 ```
+
+## Disclaimer
+
+Generated responses may be inaccurate or inappropriate. Use this application
+ethically and avoid uploading any sensitive or confidential information.
