@@ -5,4 +5,4 @@ protobuf==3.20.3
 transformers
 sentence-transformers==2.6.1
 grpcio-reflection
-llama-cpp-python==0.2.90
+llama-cpp-python>=0.2.90
