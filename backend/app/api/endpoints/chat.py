@@ -1,14 +1,14 @@
-# backend/app/api/endpoints/chat.py (最终修正版)
-
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Body
-from ....session_manager import (
+from ...core.grpc_client import grpc_client_manager
+from ...services.knowledge_base import kb_service
+from ...services.session_manager import (
     create_session,
     get_session_context,
     append_message,
 )
-from ...core.grpc_client import grpc_client_manager
-from ...services.knowledge_base import kb_service
+from ...protos import inference_pb2
 import logging
+import json
 
 END_TOKEN = "<END>"
 
@@ -21,14 +21,20 @@ async def chat_api(query: str = Body(..., embed=True), session_id: str | None = 
     """HTTP endpoint for chat with optional session management."""
     if not session_id:
         session_id = create_session()
-    # Retrieve conversation history (not currently used in prompt generation)
+
+    # Retrieve history (unused in simple HTTP mode)
     _ = get_session_context(session_id)
 
     try:
         context = await kb_service.search(query, n_results=3)
         final_prompt = build_prompt_with_context(query, context)
+        messages_for_grpc = [{"role": "user", "content": final_prompt}]
+        grpc_req = inference_pb2.ChatRequest(
+            messages=[inference_pb2.Message(role=m["role"], content=m["content"]) for m in messages_for_grpc],
+            session_id=session_id,
+        )
         answer = ""
-        async for token in grpc_client_manager.chat(final_prompt):
+        async for token in grpc_client_manager.chat(grpc_req):
             answer += token
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -38,8 +44,9 @@ async def chat_api(query: str = Body(..., embed=True), session_id: str | None = 
 
     return {"session_id": session_id, "answer": answer}
 
+
 def build_prompt_with_context(query: str, context: list[str]) -> str:
-    """将用户问题和检索到的上下文拼接成一个增强的Prompt"""
+    """Combine user question and retrieved context into one prompt."""
     if not context:
         return query
 
@@ -63,56 +70,42 @@ def build_prompt_with_context(query: str, context: list[str]) -> str:
 @router.websocket("/ws")
 async def websocket_chat(websocket: WebSocket):
     await websocket.accept()
-    session_id = websocket.query_params.get("session_id")
-    if not session_id:
-        session_id = create_session()
-    await websocket.send_text(f"[SESSION_ID]{session_id}")
-    logger.info(
-        f"WebSocket connection accepted from: {websocket.client}, session {session_id}"
-    )
+    session_id = None
 
     try:
         while True:
-            user_query = await websocket.receive_text()
-            user_query = user_query.strip()
+            raw_data = await websocket.receive_text()
+            data = json.loads(raw_data)
+            user_query = data.get("query", "").strip()
+
+            # Use existing session or create a new one
+            session_id = data.get("session_id") or create_session()
+
             if not user_query:
                 continue
 
-            try:
-                append_message(session_id, {"role": "user", "content": user_query})
-                # --- RAG 流程 ---
-                logger.info(f"正在为查询 '{user_query}' 检索知识库...")
+            history = get_session_context(session_id)
+            append_message(session_id, {"role": "user", "content": user_query})
 
-                # 【关键修复】在这里加上 await
-                context = await kb_service.search(user_query, n_results=3)
+            context = await kb_service.search(user_query, n_results=3)
+            final_prompt_for_model = build_prompt_with_context(user_query, context)
 
-                if context:
-                    logger.info(f"知识库检索命中：{len(context)} 条片段")
-                else:
-                    logger.warning("未能从知识库中检索到任何相关上下文。")
+            messages_for_grpc = history + [{"role": "user", "content": final_prompt_for_model}]
+            grpc_req = inference_pb2.ChatRequest(
+                messages=[inference_pb2.Message(role=m["role"], content=m["content"]) for m in messages_for_grpc],
+                session_id=session_id,
+            )
 
-                final_prompt = build_prompt_with_context(user_query, context)
+            assistant_response = ""
+            async for token in grpc_client_manager.chat(grpc_req):
+                await websocket.send_text(json.dumps({"token": token, "session_id": session_id}))
+                assistant_response += token
 
-                logger.info("正在将最终的Prompt发送到gRPC服务进行生成...")
-
-                messages = [{"role": "user", "content": final_prompt}]
-                async for token in grpc_client_manager.chat(messages):
-                answer = ""
-                async for token in grpc_client_manager.chat(final_prompt):
-                    answer += token
-
-                    await websocket.send_text(token)
-
-            except Exception as e:
-                error_msg = f"An error occurred during chat stream: {e}"
-                logger.error(error_msg, exc_info=True)
-                await websocket.send_text(f"[SYSTEM-ERROR] {error_msg}")
-            finally:
-                append_message(session_id, {"role": "assistant", "content": answer})
-                await websocket.send_text("[DONE]")
-                logger.info("Chat stream finished.")
+            append_message(session_id, {"role": "assistant", "content": assistant_response})
+            await websocket.send_text(json.dumps({"event": "[DONE]", "session_id": session_id}))
 
     except WebSocketDisconnect:
-        logger.info(f"客户端断开连接: {websocket.client}")
+        logger.info(f"Client disconnected: {websocket.client}")
     except Exception as e:
-        logger.error(f"WebSocket 处理程序中发生意外错误: {e}", exc_info=True)
+        logger.error(f"Unexpected error in websocket handler: {e}", exc_info=True)
+
