@@ -7,6 +7,7 @@
       <nav class="navigation">
         <router-link to="/knowledge-base" class="nav-item">知识库管理</router-link>
         <router-link to="/model-management" class="nav-item">模型管理</router-link>
+        <router-link to="/document-management" class="nav-item">文档管理</router-link>
       </nav>
     </aside>
     <main class="main-content">
