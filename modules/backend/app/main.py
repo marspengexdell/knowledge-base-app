@@ -7,6 +7,7 @@ from .core.grpc_client import grpc_client_manager
 import logging
 import asyncio
 from .api.endpoints.knowledge import router as knowledge_router
+from .api.endpoints.knowledge_base import router as knowledge_base_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,6 +42,7 @@ app.include_router(chat_router, prefix="/api/chat", tags=["Chat"])
 app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 app.include_router(embedding_router, prefix="/api/embedding", tags=["Embedding"])
 app.include_router(knowledge_router, prefix="/api/admin/knowledge")
+app.include_router(knowledge_base_router, prefix="/api/admin/kb", tags=["KnowledgeBase"])
 
 @app.get("/")
 def read_root():

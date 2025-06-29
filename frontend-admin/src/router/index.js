@@ -5,6 +5,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import KnowledgeBase from '../views/KnowledgeBase.vue';
 import ModelManagement from '../views/ModelManagement.vue';
 import FeedbackReview from '../views/FeedbackReview.vue';
+import DocumentManagement from '../views/DocumentManagement.vue';
 
 // --- Route Definitions ---
 const routes = [
@@ -30,6 +31,12 @@ const routes = [
     // Use the actual component here
     component: FeedbackReview,
     meta: { title: '反馈审查' }
+  },
+  {
+    path: '/document-management',
+    name: 'DocumentManagement',
+    component: DocumentManagement,
+    meta: { title: '文档管理' }
   },
 ];
 
