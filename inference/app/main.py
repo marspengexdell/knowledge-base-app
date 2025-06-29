@@ -137,36 +137,20 @@ class ModelManager:
             threading.Thread(target=self._load_model_in_background, args=(new_model_name,), daemon=True).start()
             return {"status": "loading_started", "name": new_model_name}
 
-    def infer_stream(self, query, history=None):
+    def infer_stream(self, messages: list[dict]):
         if self.status != ModelStatus.READY or not self.model:
             raise RuntimeError("模型未就绪")
-            
-        messages = history[:] if history else []
-        messages.append({"role": "user", "content": query})
 
-        if self.model_type in ("qwen", "yi"):
-            prompt = build_prompt_qwen(messages)
-            stream = self.model.create_completion(
-                prompt=prompt,
-                stream=True,
-                max_tokens=MAX_TOKENS,
-                stop=EARLY_STOP_TOKENS or None,
-            )
-            for output in stream:
-                token = output["choices"][0].get("text", "")
-                if token:
-                    yield token
-        else:
-            stream = self.model.create_chat_completion(
-                messages=messages,
-                stream=True,
-                max_tokens=MAX_TOKENS,
-                stop=EARLY_STOP_TOKENS or None,
-            )
-            for output in stream:
-                token = output["choices"][0].get("delta", {}).get("content", "")
-                if token:
-                    yield token
+        stream = self.model.create_chat_completion(
+            messages=messages,
+            stream=True,
+            max_tokens=MAX_TOKENS,
+            stop=EARLY_STOP_TOKENS or None,
+        )
+        for output in stream:
+            token = output["choices"][0].get("delta", {}).get("content", "")
+            if token:
+                yield token
 
 model_manager = ModelManager()
 
@@ -203,7 +187,8 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
 
     def ChatStream(self, request, context):
         try:
-            for token in model_manager.infer_stream(request.query):
+            messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+            for token in model_manager.infer_stream(messages):
                 yield inference_pb2.ChatResponse(token=token)
         except Exception as e:
             logger.error(f"Chat 异常: {e}", exc_info=True)
