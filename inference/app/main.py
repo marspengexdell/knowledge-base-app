@@ -136,22 +136,49 @@ class ModelManager:
                 return {"status": "already_loaded"}
             if not os.path.exists(os.path.join(MODELS_PATH, new_model_name)):
                 return {"status": "error", "message": "模型不存在"}
-            
+
             threading.Thread(target=self._load_model_in_background, args=(new_model_name,), daemon=True).start()
             return {"status": "loading_started", "name": new_model_name}
+
+    def compress_history(self, messages: list[dict], max_length: int = 4096, keep_last: int = 4) -> list[dict]:
+        total_len = sum(len(msg["content"]) for msg in messages)
+
+        if total_len <= max_length:
+            return messages
+
+        logger.info("Context length exceeded, compressing history...")
+        to_summarize = messages[:-keep_last]
+
+        summary_prompt = "请用一段话精简地总结以下对话的核心内容，以便我能理解后续对话的背景:\n"
+        for msg in to_summarize:
+            summary_prompt += f"{msg['role']}: {msg['content']}\n"
+
+        response = self.model.create_chat_completion(
+            messages=[{"role": "user", "content": summary_prompt}],
+            temperature=0.2,
+            max_tokens=256
+        )
+        summary_text = response["choices"][0]["message"]["content"]
+
+        new_history = [{"role": "system", "content": f"先前对话摘要: {summary_text}"}]
+        new_history.extend(messages[-keep_last:])
+
+        logger.info(f"History compressed. New length: {len(new_history)} messages.")
+        return new_history
 
     def infer_stream(self, messages: list[dict]):
         if self.status != ModelStatus.READY or not self.model:
             raise RuntimeError("模型未就绪")
 
-        cache_key = json.dumps(messages, sort_keys=True)
+        compressed_messages = self.compress_history(messages)
+        cache_key = json.dumps(compressed_messages, sort_keys=True)
         if cache_key in self.cache:
             cached_result = self.cache[cache_key]
             yield cached_result
             return
 
         stream = self.model.create_chat_completion(
-            messages=messages,
+            messages=compressed_messages,
             stream=True,
             max_tokens=MAX_TOKENS,
             stop=EARLY_STOP_TOKENS or None,
