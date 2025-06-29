@@ -94,9 +94,13 @@ async def websocket_chat(websocket: WebSocket):
                 final_prompt = build_prompt_with_context(user_query, context)
 
                 logger.info("正在将最终的Prompt发送到gRPC服务进行生成...")
+
+                messages = [{"role": "user", "content": final_prompt}]
+                async for token in grpc_client_manager.chat(messages):
                 answer = ""
                 async for token in grpc_client_manager.chat(final_prompt):
                     answer += token
+
                     await websocket.send_text(token)
 
             except Exception as e:
