@@ -23,7 +23,7 @@ RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/libcuda.s
     && ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/libcuda.so.1 \
     && export LD_LIBRARY_PATH="/usr/local/cuda/lib64/stubs:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" \
     && python3 -m pip install --upgrade pip \
-    && export CMAKE_ARGS="-DLLAMA_CUBLAS=on" \
+    && export CMAKE_ARGS="-DGGML_CUDA=on" \
     && export FORCE_CMAKE=1 \
     && pip install --no-cache-dir -r requirements.txt
 
