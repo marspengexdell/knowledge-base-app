@@ -25,11 +25,12 @@ class GrpcClientManager:
         self.channel = None
         logger.info("Disconnected from gRPC server")
 
-    async def chat(self, messages):
+    async def chat(self, req: inference_pb2.ChatRequest):
+        """Stream chat completions from the inference server."""
         if not self.stub:
             yield "[Error: no connection]"
             return
-        req = inference_pb2.ChatRequest(messages=[inference_pb2.Message(role=m["role"], content=m["content"]) for m in messages])
+
         async for resp in self.stub.ChatStream(req):
             if resp.HasField("token"):
                 yield resp.token
