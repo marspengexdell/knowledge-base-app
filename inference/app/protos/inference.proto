@@ -11,9 +11,14 @@ service InferenceService {
 
 
 message Empty {}
+message Message {
+  string role = 1;
+  string content = 2;
+}
+
 message ChatRequest {
-    string query = 1;
-    string session_id = 2; 
+    repeated Message messages = 1;
+    optional string session_id = 2;
 }
 
 message ChatResponse {
