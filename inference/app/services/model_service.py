@@ -4,7 +4,7 @@ from llama_cpp import Llama
 from sentence_transformers import SentenceTransformer
 from .utils import get_chat_handler
 from typing import Optional
-from app.config import MAX_TOKENS, EARLY_STOP_TOKENS, USE_KV_CACHE
+from app.config import MAX_TOKENS, EARLY_STOP_TOKENS, ENABLE_CACHE
 
 DEFAULT_MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "150"))
 STOP_TOKEN = os.getenv("STOP_TOKEN")
@@ -138,7 +138,7 @@ class RAGService:
                 stream = self.generation_model(
                     prompt=prompt,
                     stream=True,
-                    use_cache=USE_KV_CACHE,
+                    cache=ENABLE_CACHE,
                     max_tokens=limit,
                     stop=EARLY_STOP_TOKENS or None,
                 )
@@ -163,7 +163,7 @@ class RAGService:
                 prompt=final_prompt,
                 stop=stop_sequences,
                 stream=True,
-                use_cache=USE_KV_CACHE,
+                cache=ENABLE_CACHE,
                 max_tokens=limit,
             )
             for output in stream:
