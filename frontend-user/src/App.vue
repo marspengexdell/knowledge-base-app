@@ -43,6 +43,7 @@ const userInput = ref('');
 const isConnected = ref(false);
 const isGenerating = ref(false);
 const chatWindow = ref(null);
+const sessionId = ref('');
 let socket = null;
 
 // --- WebSocket Logic ---
@@ -58,24 +59,26 @@ const connectWebSocket = () => {
   };
 
   socket.onmessage = (event) => {
-    const receivedData = event.data;
+    const data = JSON.parse(event.data);
 
-    // ★ 修正 1：优先处理 [DONE] 信号
-    if (receivedData === '[DONE]') {
-      isGenerating.value = false; // 只有在收到DONE时才表示生成完毕
-      return;
+    if (data.session_id) {
+      sessionId.value = data.session_id;
     }
 
-    const lastMessage = messages.value[messages.value.length - 1];
-    if (lastMessage && lastMessage.role === 'assistant') {
-      // ★ 修正 2：改进初次token的处理
-      // 如果内容还是占位符，就替换它；否则，追加。
-      if (lastMessage.content === '🤔 思考中...') {
-        lastMessage.content = receivedData;
-      } else {
-        lastMessage.content += receivedData;
+    if (data.token) {
+      const lastMessage = messages.value[messages.value.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant') {
+        if (lastMessage.content === '🤔 思考中...') {
+          lastMessage.content = data.token;
+        } else {
+          lastMessage.content += data.token;
+        }
+        scrollToBottom();
       }
-      scrollToBottom();
+    }
+
+    if (data.event === '[DONE]') {
+      isGenerating.value = false;
     }
   };
 
@@ -106,7 +109,11 @@ const sendMessage = () => {
     content: userInput.value,
   });
 
-  socket.send(userInput.value);
+  const payload = {
+    query: userInput.value,
+    session_id: sessionId.value
+  };
+  socket.send(JSON.stringify(payload));
   userInput.value = '';
   isGenerating.value = true; // 开始生成
 
