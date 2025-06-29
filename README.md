@@ -242,3 +242,9 @@ docker compose up --build
 
 Nginx exposes ports `80` and `443` while the individual services communicate
 through the internal Docker network.
+=======
+## Disclaimer
+
+Generated responses may be inaccurate or inappropriate. Use this application
+ethically and avoid uploading any sensitive or confidential information.
+
