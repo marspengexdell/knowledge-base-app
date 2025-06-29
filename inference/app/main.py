@@ -10,8 +10,7 @@ import logging
 import threading
 import time
 from app.utils import IS_GPU_AVAILABLE
-# 确保从配置中导入了 USE_KV_CACHE
-from app.config import MAX_TOKENS, EARLY_STOP_TOKENS, USE_KV_CACHE
+from app.config import MAX_TOKENS, EARLY_STOP_TOKENS
 from enum import Enum
 
 logging.basicConfig(
@@ -150,7 +149,6 @@ class ModelManager:
             stream = self.model.create_completion(
                 prompt=prompt,
                 stream=True,
-                cache=USE_KV_CACHE,  # ★ cache参数已启用
                 max_tokens=MAX_TOKENS,
                 stop=EARLY_STOP_TOKENS or None,
             )
@@ -162,7 +160,6 @@ class ModelManager:
             stream = self.model.create_chat_completion(
                 messages=messages,
                 stream=True,
-                cache=USE_KV_CACHE, # ★ cache参数已启用
                 max_tokens=MAX_TOKENS,
                 stop=EARLY_STOP_TOKENS or None,
             )
