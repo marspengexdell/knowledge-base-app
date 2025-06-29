@@ -187,30 +187,3 @@ const scrollToBottom = () => {
 
 </script>
 
-<style>
-/* 为了让 Tailwind Prose 插件样式生效，需要引入它的基础样式 */
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
-
-/* 定制 Salesforce 风格的颜色 */
-@layer base {
-  :root {
-    --salesforce-blue: #0070D2;
-    --salesforce-blue-dark: #005FB2;
-    --neutral-100: #FFFFFF;
-    --neutral-95: #F3F3F3;
-    --neutral-80: #E0E0E0;
-    --neutral-50: #6B6B6B;
-    --neutral-10: #181818;
-  }
-}
-
-.prose {
-  color: var(--neutral-10);
-}
-.prose a {
-  color: var(--salesforce-blue);
-}
-/* ... 更多 prose 样式定制 */
-</style>
