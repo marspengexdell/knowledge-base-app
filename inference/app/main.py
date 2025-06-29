@@ -12,6 +12,8 @@ import time
 from app.utils import IS_GPU_AVAILABLE
 from app.config import MAX_TOKENS, EARLY_STOP_TOKENS
 from enum import Enum
+import json
+from diskcache import Cache
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,6 +72,7 @@ class ModelManager:
         self.embedding_model = None
         self.embedding_model_name = ""
         self.lock = threading.Lock()
+        self.cache = Cache(".cache")
         self.initialized = True
         logger.info("模型管理器初始化完成。")
 
@@ -141,16 +144,26 @@ class ModelManager:
         if self.status != ModelStatus.READY or not self.model:
             raise RuntimeError("模型未就绪")
 
+        cache_key = json.dumps(messages, sort_keys=True)
+        if cache_key in self.cache:
+            cached_result = self.cache[cache_key]
+            yield cached_result
+            return
+
         stream = self.model.create_chat_completion(
             messages=messages,
             stream=True,
             max_tokens=MAX_TOKENS,
             stop=EARLY_STOP_TOKENS or None,
         )
+        full_response = ""
         for output in stream:
             token = output["choices"][0].get("delta", {}).get("content", "")
             if token:
+                full_response += token
                 yield token
+
+        self.cache[cache_key] = full_response
 
 model_manager = ModelManager()
 
