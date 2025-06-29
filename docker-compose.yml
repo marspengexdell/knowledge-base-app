@@ -1,12 +1,12 @@
 services:
   backend:
     build:
-      context: ./backend
+      context: ./modules/backend
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/app:/app/app
+      - ./modules/backend/app:/app/app
       - ./models:/models:ro
       - ./knowledge_base_docs:/app/app/knowledge_base_docs
     environment:
@@ -47,7 +47,7 @@ services:
 
   inference:
     build:
-      context: ./inference
+      context: ./modules/inference
       dockerfile: Dockerfile
     volumes:
       - ./models:/models:rw
