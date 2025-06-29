@@ -5,12 +5,15 @@ FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04 AS base
 RUN apt-get update && apt-get install -y \
     build-essential python3.10 python3-pip \
     git cmake dos2unix \
-    && rm -rf /var/lib/apt/lists/* \
-    # 配置 CUDA 库路径
-    && echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/cuda.conf && ldconfig
+    && rm -rf /var/lib/apt/lists/*
 
 # 第二阶段：构建最终镜像
 FROM base AS final
+
+# ★ 核心修复：为链接器设置正确的库搜索路径 ★
+# 确保在构建过程和运行时都能找到CUDA库
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
+RUN echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/cuda.conf && ldconfig
 
 WORKDIR /app
 
@@ -18,8 +21,7 @@ WORKDIR /app
 COPY requirements.txt .
 COPY app /app/app
 
-# ★ 核心修复：使用新的编译标志 GGML_CUDA ★
-# 升级 pip 并使用正确的编译标志重新安装所有依赖
+# 使用新的编译标志 GGML_CUDA 重新安装所有依赖
 RUN python3 -m pip install --upgrade pip \
     && export CMAKE_ARGS="-DGGML_CUDA=on" \
     && export FORCE_CMAKE=1 \
@@ -34,7 +36,7 @@ RUN touch protos/__init__.py \
 
 # 设置工作目录和 Python 路径
 WORKDIR /app
-ENV PYTHONPATH="${PYTHONPATH}:/app"
+ENV PYTHONPATH="/app:${PYTHONPATH}"
 
 EXPOSE 50051
 
