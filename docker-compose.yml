@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   backend:
     build:
@@ -84,26 +86,15 @@ services:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
-      - ./data/certbot/www:/var/www/certbot
+    depends_on:
+      - backend
+      - frontend-user
+      - frontend-admin
     networks:
       - app-network
-    # depends_on:
-    #   - backend
-    #   - frontend-user
-    #   - frontend-admin
-
-  certbot:
-    image: certbot/certbot
-    volumes:
-      - certbot-etc:/etc/letsencrypt
-      - certbot-web:/var/www/certbot
-    entrypoint: >-
-      sh -c 'trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew; done'
 
 volumes:
   chroma-data:
-  certbot-etc:
-  certbot-web:
 
 networks:
   app-network:
