@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 import os
 import logging
 
-from ...services.knowledge_base import kb_service
+from services.knowledge_base import kb_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

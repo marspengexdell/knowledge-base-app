@@ -1,14 +1,14 @@
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
-from .api.endpoints.chat import router as chat_router
-from .api.endpoints.admin import router as admin_router
-from .api.endpoints.embedding import router as embedding_router
-from .core.grpc_client import grpc_client_manager
+from api.endpoints.chat import router as chat_router
+from api.endpoints.admin import router as admin_router
+from api.endpoints.embedding import router as embedding_router
+from core.grpc_client import grpc_client_manager
 import logging
 import asyncio
-from .api.endpoints.knowledge import router as knowledge_router
-from .api.endpoints.knowledge_base import router as knowledge_base_router
-from .api.endpoints.models import router as models_router
+from api.endpoints.knowledge import router as knowledge_router
+from api.endpoints.knowledge_base import router as knowledge_base_router
+from api.endpoints.models import router as models_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -1,4 +1,4 @@
-from ..core.grpc_client import grpc_client_manager
+from core.grpc_client import grpc_client_manager
 from typing import List
 import asyncio # 【新增】导入asyncio
 
