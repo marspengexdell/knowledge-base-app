@@ -7,7 +7,7 @@
         </svg>
         <h1 class="text-xl font-semibold text-neutral-10">知识库管理后台</h1>
       </div>
-      </header>
+    </header>
 
     <div class="flex flex-1 overflow-hidden">
       <aside class="w-64 bg-neutral-100 border-r border-neutral-80 p-2">
@@ -16,9 +16,9 @@
             v-for="item in navItems"
             :key="item.name"
             :to="item.path"
-            class="px-4 py-2.5 text-sm font-medium rounded-md transition-colors"
-            active-class="bg-salesforce-blue/10 text-salesforce-blue"
-            exact-active-class="bg-salesforce-blue/10 text-salesforce-blue"
+            class="px-4 py-2.5 text-sm font-medium rounded-md transition-colors hover:bg-salesforce-blue/5"
+            active-class="bg-salesforce-blue/10 text-salesforce-blue font-semibold"
+            exact-active-class="bg-salesforce-blue/10 text-salesforce-blue font-semibold"
           >
             {{ item.name }}
           </router-link>
@@ -36,16 +36,9 @@
 import { ref } from 'vue';
 
 const navItems = ref([
-  { name: '仪表盘', path: '/' },
-  { name: '模型管理', path: '/model-management' },
-  { name: '知识库上传', path: '/knowledge-base' },
-  { name: '文档管理', path: '/document-management' },
+  { name: '仪表盘', path: '/admin/' }, // 路径修改为/admin/
+  { name: '模型管理', path: '/admin/model-management' },
+  { name: '知识库上传', path: '/admin/knowledge-base' },
+  { name: '文档管理', path: '/admin/document-management' },
 ]);
 </script>
-
-<style>
-/* 可以在这里添加全局字体等样式 */
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-}
-</style>
