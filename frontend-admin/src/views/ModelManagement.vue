@@ -1,214 +1,120 @@
 <template>
-  <div class="model-management-container">
-    <el-card class="box-card">
-      <template #header>
-        <div class="card-header">
-          <span>生成模型 (Generation Model)</span>
-          <el-tag v-if="modelsInfo.device" type="info">运行设备: {{ modelsInfo.device }}</el-tag>
-        </div>
-      </template>
-      <div class="model-selector">
-        <el-select
-          v-model="selection.generationModel"
-          placeholder="请选择生成模型"
-          size="large"
-          style="width: 100%;"
-        >
-          <el-option
-            v-for="model in modelsInfo.generation_models"
-            :key="model"
-            :label="model"
-            :value="model"
-          >
-            <span style="float: left">{{ model }}</span>
-            <span
-              v-if="model === modelsInfo.current_generation_model"
-              style="float: right; color: var(--el-text-color-secondary); font-size: 13px;"
-            >
-              当前
-            </span>
-          </el-option>
-        </el-select>
-        <el-button
-          type="primary"
-          @click="handleSwitchModel('generation')"
-          :loading="loading.generation"
-          class="switch-button"
-        >
-          {{ loading.generation ? '切换中...' : '切换模型' }}
-        </el-button>
-      </div>
-    </el-card>
+  <div>
+    <h2 class="text-2xl font-semibold mb-6 text-gray-800">模型管理</h2>
 
-    <el-card class="box-card">
-      <template #header>
-        <div class="card-header">
-          <span>嵌入模型 (Embedding Model)</span>
-        </div>
-      </template>
-      <div class="model-selector">
-        <el-select
-          v-model="selection.embeddingModel"
-          placeholder="请选择嵌入模型"
-          size="large"
-          style="width: 100%;"
-        >
-          <el-option
-            v-for="model in modelsInfo.embedding_models"
-            :key="model"
-            :label="model"
-            :value="model"
-          >
-            <span style="float: left">{{ model }}</span>
-            <span
-              v-if="model === modelsInfo.current_embedding_model"
-              style="float: right; color: var(--el-text-color-secondary); font-size: 13px;"
-            >
-              当前
-            </span>
-          </el-option>
-        </el-select>
-        <el-button
-          type="primary"
-          @click="handleSwitchModel('embedding')"
-          :loading="loading.embedding"
-          class="switch-button"
-        >
-          {{ loading.embedding ? '切换中...' : '切换模型' }}
-        </el-button>
-      </div>
-    </el-card>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-1">
+        <el-card shadow="never" class="h-full">
+          <template #header>
+            <div class="font-semibold">上传新模型</div>
+          </template>
 
-    <el-card class="box-card">
-      <template #header>
-        <div class="card-header">
-          <span>上传新模型</span>
-        </div>
-      </template>
-      <el-upload
-        class="upload-demo"
-        drag
-        :action="uploadUrl"
-        :headers="uploadHeaders"
-        :before-upload="beforeUpload"
-        :on-success="handleUploadSuccess"
-        :on-error="handleUploadError"
-        multiple
-      >
-        <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-        <div class="el-upload__text">
-          将文件拖到此处，或<em>点击上传</em>
-        </div>
-        <template #tip>
-          <div class="el-upload__tip">
-            仅支持 .gguf 或 .safetensors 格式的模型文件。
-          </div>
-        </template>
-      </el-upload>
-    </el-card>
+          <el-upload
+            drag
+            action="/api/admin/models/upload"
+            :on-success="handleSuccess"
+            :on-error="handleError"
+            :before-upload="beforeUpload"
+            class="w-full"
+          >
+            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+            <div class="el-upload__text">
+              将 GGUF 模型文件拖到此处，或<em>点击上传</em>
+            </div>
+            <template #tip>
+              <div class="el-upload__tip mt-2">
+                请上传 .gguf 格式的模型文件。
+              </div>
+            </template>
+          </el-upload>
+        </el-card>
+      </div>
+
+      <div class="lg:col-span-2">
+        <el-card shadow="never">
+          <template #header>
+            <div class="flex justify-between items-center">
+              <span class="font-semibold">已上传模型</span>
+              <el-button type="primary" :icon="Refresh" circle @click="fetchModels" />
+            </div>
+          </template>
+
+          <el-table :data="models" v-loading="loading" style="width: 100%">
+            <el-table-column prop="name" label="模型文件名">
+               <template #default="scope">
+                 <div class="flex items-center">
+                    <el-icon class="mr-2 text-gray-400"><Tickets /></el-icon>
+                    <span>{{ scope.row.name }}</span>
+                 </div>
+               </template>
+            </el-table-column>
+
+            <el-table-column label="状态" width="120" align="center">
+              <template #default>
+                <el-tag type="success">可用</el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <el-empty v-if="!loading && models.length === 0" description="暂无已上传的模型" />
+        </el-card>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue';
+import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { ElMessage } from 'element-plus';
-import { UploadFilled } from '@element-plus/icons-vue';
+import { UploadFilled, Refresh, Tickets } from '@element-plus/icons-vue';
 
-const modelsInfo = ref({
-  generation_models: [],
-  embedding_models: [],
-  current_generation_model: '',
-  current_embedding_model: '',
-  device: ''
-});
-const selection = reactive({
-  generationModel: '',
-  embeddingModel: ''
-});
-const loading = reactive({
-  generation: false,
-  embedding: false
-});
-const uploadUrl = '/api/admin/models/upload';
-const uploadHeaders = {};
+const models = ref([]);
+const loading = ref(false);
 
+// 获取模型列表
 const fetchModels = async () => {
+  loading.value = true;
   try {
-    const { data } = await axios.get('/api/admin/models');
-    modelsInfo.value = data;
-    selection.generationModel = data.current_generation_model || '';
-    selection.embeddingModel = data.current_embedding_model || '';
+    const response = await axios.get('/api/admin/models/list');
+    // 后端返回 { "models": ["model1.gguf", "model2.gguf"] }
+    // 转换为 [{ name: 'model1.gguf' }, ...]
+    models.value = response.data.models.map(modelName => ({ name: modelName }));
   } catch (error) {
-    ElMessage.error('获取模型列表失败！');
-    console.error(error);
-  }
-};
-
-const beforeUpload = (file) => {
-  const isValid = file.name.endsWith('.gguf') || file.name.endsWith('.safetensors');
-  if (!isValid) {
-    ElMessage.error('仅支持 .gguf 或 .safetensors 格式的模型文件！');
-  }
-  return isValid;
-};
-
-const handleUploadSuccess = (res) => {
-  ElMessage.success(res.message || '模型上传成功！');
-  fetchModels();
-};
-
-const handleUploadError = (err) => {
-  ElMessage.error('模型上传失败！');
-  console.error(err);
-};
-
-const handleSwitchModel = async (modelType) => {
-  const modelName = modelType === 'generation' ? selection.generationModel : selection.embeddingModel;
-  if (!modelName) {
-    ElMessage.warning('请先选择一个模型！');
-    return;
-  }
-  loading[modelType] = true;
-  try {
-    await axios.post('/api/admin/models/switch', {
-      model_name: modelName,
-      model_type: modelType.toUpperCase()    // ★ 关键修正点：转大写
-    });
-    ElMessage.success('模型切换请求已发送！');
-    setTimeout(fetchModels, 2000);
-  } catch (error) {
-    ElMessage.error(error.response?.data?.detail || '模型切换失败！');
+    ElMessage.error('获取模型列表失败');
     console.error(error);
   } finally {
-    loading[modelType] = false;
+    loading.value = false;
   }
 };
 
-onMounted(fetchModels);
-</script>
+// 上传成功回调
+const handleSuccess = (response, file) => {
+  if (response.success) {
+    ElMessage.success(`模型 "${file.name}" 上传成功！`);
+    fetchModels(); // 上传成功后刷新列表
+  } else {
+    ElMessage.error(response.message || `模型 "${file.name}" 上传失败。`);
+  }
+};
 
-<style scoped>
-.model-management-container {
-  padding: 20px;
-}
-.box-card {
-  margin-bottom: 20px;
-}
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.model-selector {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-.switch-button {
-  margin-left: auto;
-}
-.el-upload__tip {
-  margin-top: 10px;
-}
-</style>
+// 上传失败回调
+const handleError = (error, file) => {
+  ElMessage.error(`模型 "${file.name}" 上传失败，请检查网络或联系管理员。`);
+  console.error(error);
+};
+
+// 上传前检查
+const beforeUpload = (file) => {
+  const isGGUF = file.name.endsWith('.gguf');
+  if (!isGGUF) {
+    ElMessage.error('只能上传 .gguf 格式的文件！');
+  }
+  return isGGUF;
+};
+
+// 组件加载时，自动获取一次列表
+onMounted(() => {
+  fetchModels();
+});
+</script>
