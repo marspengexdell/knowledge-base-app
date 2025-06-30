@@ -1,3 +1,4 @@
+import './index.css'
 import { createApp } from 'vue'
 
 // Import Element Plus UI Library and its base styles
