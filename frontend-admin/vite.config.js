@@ -34,6 +34,8 @@ export default defineConfig({
       }
     }
   },
+  // Base path for serving the admin front-end
+  base: '/admin/',
   // Optional: Configure build options, like output directory
   build: {
     outDir: 'dist',
