@@ -1,13 +1,13 @@
     from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Body
-    # 核心修正：将 '..' 改为 '...'，以正确地从项目顶层导入模块
-    from ...core.grpc_client import grpc_client_manager
-    from ...services.knowledge_base import kb_service
-    from ...services.session_manager import (
+    # 核心修正：将 '...' 改为 '..'，以正确地从项目顶层导入模块
+    from ..core.grpc_client import grpc_client_manager
+    from ..services.knowledge_base import kb_service
+    from ..services.session_manager import (
         create_session,
         get_session_context,
         append_message,
     )
-    from ...protos import inference_pb2
+    from ..protos import inference_pb2
     import logging
     import json
     
