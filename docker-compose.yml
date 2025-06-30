@@ -33,7 +33,7 @@ services:
     ports:
       - "8000:8000"
     networks:
-      - my_network
+      - app-network
     restart: always
 
   # 推理服务: 运行AI模型
@@ -97,8 +97,6 @@ services:
 # 定义一个全局网络，让所有服务都在同一个局域网内
 networks:
   app-network:
-    driver: bridge
-  my_network:
     driver: bridge
 
 # 定义一个持久化数据卷，用于存储ChromaDB的数据
