@@ -1,0 +1,7 @@
+/* modules/frontend-admin/src/index.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 这里可以放一些全局的、覆盖性的样式，如果需要的话 */
