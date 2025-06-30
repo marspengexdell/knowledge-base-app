@@ -1,11 +1,7 @@
-/* modules/frontend-user/src/index.css */
-
-/* 1. 导入 Tailwind CSS 的核心样式 */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 2. 在这里定义你的全局样式和颜色变量 */
 @layer base {
   :root {
     --salesforce-blue: #0070D2;
@@ -17,27 +13,22 @@
     --neutral-10: #181818;
   }
 
+  html, body, #app {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   }
 }
 
-/* 3. 在这里可以添加对 Prose 等插件的定制样式 */
 .prose {
   color: var(--neutral-10);
 }
 .prose a {
   color: var(--salesforce-blue);
-}
-
-/* 强制 html, body 和我们的主应用容器(#app)
-  高度和宽度都占满 100%，并清除所有内外边距。
-  这将覆盖掉任何可能引起问题的旧样式。
-*/
-html, body, #app {
-  height: 100%;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden; /* 防止出现不必要的滚动条 */
 }
