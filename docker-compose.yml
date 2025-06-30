@@ -26,30 +26,15 @@ services:
   backend:
     build:
       context: ./modules/backend
+      dockerfile: Dockerfile
     container_name: knowledge-base-app-backend
-    restart: unless-stopped
     volumes:
-      # 核心修正: 将主机上的持久化存储目录，精确地挂载到服务代码所期望的容器内路径
-      # 这确保了上传的模型和文档，都能被正确地保存和读取。
-      - ./model_storage:/app/model_storage 
-      - ./document_storage:/app/document_storage
-    environment:
-      # 核心修正: 使用一个完整的URL来定义gRPC和向量数据库的地址，更健壮
-      - GRPC_SERVER_ADDRESS=inference:50051
-      - VECTOR_DB_URL=http://vector-db:8000
-    depends_on:
-      # 优化: 明确定义启动依赖，确保网络和数据库就绪
-      vector-db:
-        condition: service_started
-      inference:
-        condition: service_started
+      - ./modules/backend/app:/app
+    ports:
+      - "8000:8000"
     networks:
-      - app-network
-    healthcheck: # 优化: 添加健康检查，确保服务真实可用
-      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+      - my_network
+    restart: always
 
   # 推理服务: 运行AI模型
   inference:
@@ -112,6 +97,8 @@ services:
 # 定义一个全局网络，让所有服务都在同一个局域网内
 networks:
   app-network:
+    driver: bridge
+  my_network:
     driver: bridge
 
 # 定义一个持久化数据卷，用于存储ChromaDB的数据

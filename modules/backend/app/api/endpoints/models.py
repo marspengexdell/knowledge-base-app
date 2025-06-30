@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import logging
 
-from ....services.model_management import model_service
+from services.model_management import model_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

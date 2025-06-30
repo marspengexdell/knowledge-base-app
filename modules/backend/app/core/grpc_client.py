@@ -1,7 +1,7 @@
 import grpc
-import app.protos.inference_pb2 as inference_pb2
-import app.protos.inference_pb2_grpc as inference_pb2_grpc
-from app.core.settings import settings
+from protos import inference_pb2
+from protos import inference_pb2_grpc
+from core.settings import settings
 import logging
 from typing import List
 
