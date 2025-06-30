@@ -1,7 +1,7 @@
-// frontend-user/postcss.config.js (正确配置)
+// frontend-user/postcss.config.js (v3 版本的正确配置)
 export default {
   plugins: {
-    '@tailwindcss/postcss': {}, // 使用新的、正确的插件名
+    tailwindcss: {}, // 使用 v3 的标准方式
     autoprefixer: {},
   },
 }
