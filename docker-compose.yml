@@ -8,16 +8,12 @@ services:
   nginx:
     image: nginx:1.25.4-alpine
     container_name: knowledge-base-app-nginx
-    restart: always
+    restart: unless-stopped
     ports:
-      # 在本地测试时，只暴露80端口
       - "80:80"
-      # 当你需要部署到公网并启用HTTPS时，再取消下面这行的注释
-      # - "443:443"
+      # - "443:443" # 为HTTPS预留
     volumes:
-      # 挂载Nginx配置文件
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
-      # 为将来启用HTTPS预留的证书挂载点 (本地测试时这些目录可以是空的)
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro # 配置文件以只读方式挂载，更安全
       - ./data/certbot/conf:/etc/letsencrypt:ro
       - ./data/certbot/www:/var/www/certbot:ro
     networks:
@@ -32,57 +28,63 @@ services:
     build:
       context: ./modules/backend
     container_name: knowledge-base-app-backend
-    restart: always
-    dns: # <-- 修正: 添加DNS，解决网络访问问题
-      - 8.8.8.8
-      - 1.1.1.1
+    restart: unless-stopped
     volumes:
-      # 只挂载应用代码，而不是整个目录，用于开发热更新
-      - ./modules/backend/app:/app/app
-      # 允许后端写入(rw)模型，用于上传
-      - ./models:/models:rw
-      - ./knowledge_base_docs:/app/app/knowledge_base_docs
+      # 核心修正: 将主机上的持久化存储目录，精确地挂载到服务代码所期望的容器内路径
+      # 这确保了上传的模型和文档，都能被正确地保存和读取。
+      - ./model_storage:/app/model_storage 
+      - ./document_storage:/app/document_storage
     environment:
+      # 核心修正: 使用一个完整的URL来定义gRPC和向量数据库的地址，更健壮
       - GRPC_SERVER_ADDRESS=inference:50051
-      - VECTOR_DB_HOST=vector-db
-      - VECTOR_DB_PORT=8000
+      - VECTOR_DB_URL=http://vector-db:8000
     depends_on:
-      - vector-db
-      - inference
+      # 优化: 明确定义启动依赖，确保网络和数据库就绪
+      vector-db:
+        condition: service_started
+      inference:
+        condition: service_started
     networks:
       - app-network
+    healthcheck: # 优化: 添加健康检查，确保服务真实可用
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   # 推理服务: 运行AI模型
   inference:
     build:
       context: ./modules/inference
     container_name: knowledge-base-app-inference
-    restart: always
-    dns: # <-- 修正: 添加DNS，解决模型下载问题
-      - 8.8.8.8
-      - 1.1.1.1
+    restart: unless-stopped
     volumes:
-      # 推理服务只需要读取(ro)模型
-      - ./models:/models:ro
-    deploy: # <-- 优化: 统一使用 deploy 方式配置GPU资源
+      # 核心修正: 推理服务从与后端相同的模型存储目录中读取模型
+      - ./model_storage:/app/models:ro # 容器内的路径是 /app/models，与推理服务的代码逻辑匹配
+    deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    shm_size: '2gb' # 共享内存大小，对某些模型很重要
+    shm_size: '2gb'
     networks:
       - app-network
-    # healthcheck 保持不变，是个好习惯
+    healthcheck: # 优化: 添加健康检查
+      # 这里假设推理服务在某个端口提供了一个健康检查端点，例如 50051
+      # 如果没有，可以检查一个总是存在的文件
+      test: ["CMD", "grpc_health_probe", "-addr=:50051"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   # 用户前端
   frontend-user:
     build:
-      context: ./frontend-user # 修正: 你的目录名是 frontend-user
+      context: ./frontend-user
     container_name: knowledge-base-app-frontend-user
-    restart: always
-    # 在Nginx模式下，不再需要直接暴露端口
+    restart: unless-stopped
     networks:
       - app-network
 
@@ -91,8 +93,7 @@ services:
     build:
       context: ./frontend-admin
     container_name: knowledge-base-app-frontend-admin
-    restart: always
-    # 在Nginx模式下，不再需要直接暴露端口
+    restart: unless-stopped
     networks:
       - app-network
 
@@ -100,12 +101,12 @@ services:
   vector-db:
     image: ghcr.io/chroma-core/chroma:latest
     container_name: knowledge-base-app-vector-db
-    restart: always
+    restart: unless-stopped
     ports:
-      # 将数据库端口映射到 8001，避免和后端可能的端口冲突
+      # 优化: 将端口映射到不常用的8001，避免冲突
       - "8001:8000"
     volumes:
-      - chroma-data:/data
+      - chroma-data:/chroma # 明确指定挂载点
     networks:
       - app-network
 
