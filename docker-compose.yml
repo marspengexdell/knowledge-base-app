@@ -44,7 +44,7 @@ services:
     restart: unless-stopped
     volumes:
       # 核心修正: 推理服务从与后端相同的模型存储目录中读取模型
-      - ./model_storage:/models:ro # 容器内的路径是 /models，与推理服务的代码逻辑匹配
+      - ./models:/models:ro # 容器内的路径是 /models，与推理服务的代码逻辑匹配
     deploy:
       resources:
         reservations:
