@@ -1,10 +1,10 @@
 import os
 from fastapi import APIRouter, UploadFile, File
-from ...core.grpc_client import grpc_client_manager
-from ...core.settings import settings
-from ..schemas.admin import ModelSwitchRequest
-from ...services.model_store import switch_generation_model, switch_embedding_model
-from ...protos import inference_pb2
+from core.grpc_client import grpc_client_manager
+from core.settings import settings
+from api.schemas.admin import ModelSwitchRequest
+from services.model_store import switch_generation_model, switch_embedding_model
+from protos import inference_pb2
 
 router = APIRouter()
 
@@ -49,7 +49,7 @@ async def get_models():
         return models
     except Exception as e:
         try:
-            from ...services.model_store import list_models as list_available_models
+            from services.model_store import list_models as list_available_models
             models = list_available_models()
             models["device"] = ""
             return models
@@ -71,7 +71,7 @@ async def get_model_status():
         return models
     except Exception as e:
         try:
-            from ...services.model_store import list_models as list_available_models
+            from services.model_store import list_models as list_available_models
             models = list_available_models()
             models["device"] = ""
             return models

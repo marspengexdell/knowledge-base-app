@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query, HTTPException
-from app.services.knowledge_base import kb_service
+from services.knowledge_base import kb_service
 
 router = APIRouter()
 

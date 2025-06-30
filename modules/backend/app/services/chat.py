@@ -2,8 +2,8 @@ import logging
 from fastapi.websockets import WebSocket
 from langchain_core.documents import Document
 
-from ...core.llm_client import llm
-from .knowledge_base import kb_service
+from core.llm_client import llm
+from services.knowledge_base import kb_service
 
 logger = logging.getLogger(__name__)
 
