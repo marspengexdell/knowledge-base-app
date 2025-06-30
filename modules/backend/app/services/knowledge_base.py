@@ -3,7 +3,8 @@ import os
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, UnstructuredWordDocumentLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from ...core.db_client import vector_db
+# 核心修正：将 '...' 改为 '..'，修正了错误的相对导入路径
+from ..core.db_client import vector_db
 from .embedding import embedding_model
 
 logger = logging.getLogger(__name__)
@@ -25,46 +26,33 @@ class KnowledgeBaseService:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"文件 '{filename}' 不存在。")
 
-        # 根据文件类型选择加载器
         if filename.endswith(".pdf"):
             loader = PyPDFLoader(file_path)
         elif filename.endswith(".docx"):
             loader = UnstructuredWordDocumentLoader(file_path)
-        else:  # 默认为文本文件
+        else:
             loader = TextLoader(file_path, encoding='utf-8')
 
         documents = loader.load()
-
-        # 切分文档
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
         text_chunks = text_splitter.split_documents(documents)
-
-        #
-        # --- 核心改动在这里 ---
-        #
-        # 设置一个合理的批次大小，以避免显存溢出
-        # 32 是一个对于中小型GPU来说比较安全的值，如果依然报错，可以尝试减小到 16 或 8
+        
         batch_size = 32
         logger.info(f"文档 '{filename}' 被切分为 {len(text_chunks)} 个片段，将以每批 {batch_size} 个进行处理。")
 
-        # 循环，分批次处理
         for i in range(0, len(text_chunks), batch_size):
             batch_chunks = text_chunks[i:i + batch_size]
-
-            # 提取每批次的文本内容
             batch_texts = [chunk.page_content for chunk in batch_chunks]
-
-            # 为这批文本生成嵌入向量
+            
             logger.info(f"正在处理第 {i // batch_size + 1} 批...")
             embeddings = await embedding_model.embed_batch(batch_texts)
-
-            # 将这批向量化的文档存入数据库
+            
             await vector_db.add_documents(
                 documents=batch_chunks,
                 embeddings=embeddings,
                 document_source=filename
             )
-
+        
         logger.info(f"文档 '{filename}' 的所有片段都已成功学习并存入数据库。")
 
     def list_documents(self):
