@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from .endpoints import chat, admin, knowledge, embedding
+from api.endpoints import chat, admin, knowledge, embedding
 
 api_router = APIRouter()
 api_router.include_router(chat.router, prefix="/chat", tags=["Chat"])
