@@ -1,148 +1,85 @@
-import os
 import logging
-from typing import List, Optional
-import chromadb
-from .embedding import embedding_model
-import asyncio # 【新增】导入asyncio
+import os
+from langchain_community.document_loaders import PyPDFLoader, TextLoader, UnstructuredWordDocumentLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# ... (常量定义) ...
-STORAGE_DIR = os.getenv("KNOWLEDGE_BASE_DIR", "/app/knowledge_base_storage")
-CHROMA_HOST = os.getenv("VECTOR_DB_HOST", "vector-db")
-CHROMA_PORT = int(os.getenv("VECTOR_DB_PORT", 8000))
-try:
-    chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
-    collection = chroma_client.get_or_create_collection(name="knowledge_base")
-except Exception as e:
-    logging.error(f"无法连接到ChromaDB: {e}", exc_info=True)
-    chroma_client = None
-    collection = None
+from ...core.db_client import vector_db
+from .embedding import embedding_model
 
 logger = logging.getLogger(__name__)
 
 class KnowledgeBaseService:
-    def __init__(self, storage_dir: str = STORAGE_DIR):
+    def __init__(self, storage_dir: str = "document_storage"):
         self.storage_dir = storage_dir
-        os.makedirs(self.storage_dir, exist_ok=True)
+        if not os.path.exists(self.storage_dir):
+            os.makedirs(self.storage_dir)
 
-    # 【修改】上传文档只负责保存文件，不再做嵌入
-    def add_document(self, file_name: str, file_data: bytes) -> bool:
-        """仅将文档保存到本地磁盘"""
-        file_path = os.path.join(self.storage_dir, file_name)
+    def add_document(self, filename: str, file_data: bytes):
+        file_path = os.path.join(self.storage_dir, filename)
         with open(file_path, "wb") as f:
             f.write(file_data)
-        logger.info(f"文档 '{file_name}' 已保存到本地。")
-        return True
+        return file_path
 
-    # 【修改】embed_document 实现分块和批量嵌入
-    async def embed_document(self, file_name: str):
-        """读取文档，分块，然后批量嵌入并存入ChromaDB。"""
-        if collection is None: raise ConnectionError("ChromaDB not connected.")
-        file_path = os.path.join(self.storage_dir, file_name)
+    async def embed_document(self, filename: str):
+        file_path = os.path.join(self.storage_dir, filename)
         if not os.path.exists(file_path):
-            logger.error(f"无法找到待嵌入的文档: {file_name}")
-            raise FileNotFoundError(f"Document '{file_name}' not found.")
+            raise FileNotFoundError(f"文件 '{filename}' 不存在。")
 
-        logger.info(f"正在读取并为文档 '{file_name}' 分块...")
-        with open(file_path, "rb") as f:
-            file_data = f.read()
+        # 根据文件类型选择加载器
+        if filename.endswith(".pdf"):
+            loader = PyPDFLoader(file_path)
+        elif filename.endswith(".docx"):
+            loader = UnstructuredWordDocumentLoader(file_path)
+        else:  # 默认为文本文件
+            loader = TextLoader(file_path, encoding='utf-8')
 
-        try:
-            text_content = file_data.decode("utf-8")
-        except UnicodeDecodeError:
-            text_content = file_data.decode("gbk", errors="ignore")
+        documents = loader.load()
 
-        chunk_size = 500
-        chunk_overlap = 50
-        text_chunks = [text_content[i:i + chunk_size] for i in range(0, len(text_content), chunk_size - chunk_overlap)]
-        if not text_chunks:
-            logger.warning(f"文档 '{file_name}' 为空，无法分块。")
-            return {"message": "Document is empty."}
-        
-        logger.info(f"文档已切分为 {len(text_chunks)} 个块。正在调用嵌入服务...")
-        
-        # 【修改】调用异步的 embed_batch
-        embeddings = await embedding_model.embed_batch(text_chunks)
-        if not embeddings or not any(embeddings):
-            raise Exception("Embedding service returned empty results.")
+        # 切分文档
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+        text_chunks = text_splitter.split_documents(documents)
 
-        chunk_ids = [f"{file_name}-chunk-{i}" for i in range(len(text_chunks))]
-        collection.add(
-            embeddings=embeddings,
-            documents=text_chunks,
-            metadatas=[{"source": file_name} for _ in text_chunks],
-            ids=chunk_ids
-        )
-        
-        logger.info(f"成功为文档 '{file_name}' 嵌入并存储了 {len(text_chunks)} 个块。")
-        return {"message": f"Successfully embedded {len(text_chunks)} chunks for document: {file_name}"}
-        
-    # 【修改】search 方法也改为异步
-    async def search(self, query: str, n_results: int = 3) -> List[str]:
-        if collection is None: raise ConnectionError("ChromaDB not connected.")
-        if not query.strip(): return []
-        
-        query_embedding = await embedding_model.embed(query)
-        if not query_embedding: return []
-        
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=n_results
-        )
-        return results.get("documents", [[]])[0]
+        #
+        # --- 核心改动在这里 ---
+        #
+        # 设置一个合理的批次大小，以避免显存溢出
+        # 32 是一个对于中小型GPU来说比较安全的值，如果依然报错，可以尝试减小到 16 或 8
+        batch_size = 32
+        logger.info(f"文档 '{filename}' 被切分为 {len(text_chunks)} 个片段，将以每批 {batch_size} 个进行处理。")
 
-    # ... (list_documents, get_document, delete_document 等保持不变或做微调) ...
-    def list_documents(self) -> List[str]:
+        # 循环，分批次处理
+        for i in range(0, len(text_chunks), batch_size):
+            batch_chunks = text_chunks[i:i + batch_size]
+
+            # 提取每批次的文本内容
+            batch_texts = [chunk.page_content for chunk in batch_chunks]
+
+            # 为这批文本生成嵌入向量
+            logger.info(f"正在处理第 {i // batch_size + 1} 批...")
+            embeddings = await embedding_model.embed_batch(batch_texts)
+
+            # 将这批向量化的文档存入数据库
+            await vector_db.add_documents(
+                documents=batch_chunks,
+                embeddings=embeddings,
+                document_source=filename
+            )
+
+        logger.info(f"文档 '{filename}' 的所有片段都已成功学习并存入数据库。")
+
+    def list_documents(self):
         return [f for f in os.listdir(self.storage_dir) if os.path.isfile(os.path.join(self.storage_dir, f))]
 
-    def get_document(self, file_name: str) -> Optional[bytes]:
-        file_path = os.path.join(self.storage_dir, file_name)
-        if not os.path.exists(file_path): return None
-        with open(file_path, "rb") as f:
-            return f.read()
-
-    def delete_document(self, file_name: str) -> bool:
-        file_path = os.path.join(self.storage_dir, file_name)
-        if not os.path.exists(file_path): return False
-        os.remove(file_path)
-        try:
-            if collection:
-                # 删除所有与该文件名相关的块
-                collection.delete(where={"source": file_name})
-        except Exception as e:
-            logger.error(f"从ChromaDB删除文档块时出错: {e}")
-            pass
-        return True
-
-    async def list_all_documents(self) -> List[dict]:
-        """列出知识库中所有唯一的文档来源(source)。"""
-        if collection is None:
-            logging.error("ChromaDB not connected.")
-            return []
-        try:
-            results = collection.get(include=["metadatas"])
-            unique_sources = {}
-            for metadata in results.get("metadatas", []):
-                source = metadata.get("source")
-                if source and source not in unique_sources:
-                    unique_sources[source] = {"id": source, "source": source}
-            logging.info(f"成功列出 {len(unique_sources)} 个独立文档源。")
-            return list(unique_sources.values())
-        except Exception as e:
-            logging.error(f"列出文档时出错: {e}", exc_info=True)
-            return []
-
-    async def delete_documents_by_source(self, source: str) -> bool:
-        """根据文档来源删除所有相关的文档片段。"""
-        if not source or collection is None:
-            return False
-        try:
-            collection.delete(where={"source": source})
-            logging.info(f"成功删除来源为 '{source}' 的所有文档。")
+    def delete_document(self, filename: str) -> bool:
+        file_path = os.path.join(self.storage_dir, filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            vector_db.delete_documents_by_source(filename)
+            logger.info(f"已从本地和向量数据库中删除文档: {filename}")
             return True
-        except Exception as e:
-            logging.error(f"删除来源为 '{source}' 的文档时出错: {e}", exc_info=True)
-            return False
+        return False
 
-# 注意：因为方法变成了异步，外部调用需要调整。
-# 单例实例保持不变
+    def search(self, query: str, top_k: int = 3):
+        return vector_db.search(query=query, top_k=top_k)
+
 kb_service = KnowledgeBaseService()
