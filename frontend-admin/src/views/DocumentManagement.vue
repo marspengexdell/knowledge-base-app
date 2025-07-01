@@ -16,11 +16,11 @@
         </thead>
         <tbody>
           <tr v-if="documents.length === 0"><td colspan="2" class="py-16 text-center text-sm text-neutral-50">知识库中暂无文档</td></tr>
-          <tr v-for="doc in documents" :key="doc.id" class="hover:bg-salesforce-blue/5">
+          <tr v-for="doc in documents" :key="doc.source" class="hover:bg-salesforce-blue/5">
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-10">{{ doc.source }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-              <button @click="confirmDelete(doc)" class="text-destructive font-medium rounded-md px-3 py-1 hover:bg-destructive/10 transition-colors disabled:opacity-50" :disabled="deleting[doc.id]">
-                {{ deleting[doc.id] ? '删除中...' : '删除' }}
+              <button @click="confirmDelete(doc)" class="text-destructive font-medium rounded-md px-3 py-1 hover:bg-destructive/10 transition-colors disabled:opacity-50" :disabled="deleting[doc.source]">
+                {{ deleting[doc.source] ? '删除中...' : '删除' }}
               </button>
             </td>
           </tr>
@@ -48,12 +48,12 @@ const confirmDelete = (doc) => {
   if (window.confirm(`确定要删除文档 "${doc.source}" 吗？此操作不可逆。`)) deleteDocument(doc);
 };
 const deleteDocument = async (doc) => {
-  deleting.value[doc.id] = true;
+  deleting.value[doc.source] = true;
   try {
     await axios.delete(`/api/admin/kb/documents/${encodeURIComponent(doc.source)}`);
-    documents.value = documents.value.filter(d => d.id !== doc.id);
+    documents.value = documents.value.filter(d => d.source !== doc.source);
   } catch (err) { alert(`删除失败: ${err.response?.data?.detail || err.message}`); }
-  finally { deleting.value[doc.id] = false; }
+  finally { deleting.value[doc.source] = false; }
 };
 onMounted(fetchDocuments);
 </script>
