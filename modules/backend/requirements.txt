@@ -13,7 +13,7 @@ protobuf==3.20.3
 sentence-transformers>=2.3.0
 torch>=1.10.0
 numpy
-chromadb
+chromadb==0.4.24
 
 # Additional libraries for document processing
 langchain-community

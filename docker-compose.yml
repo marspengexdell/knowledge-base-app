@@ -95,7 +95,7 @@ services:
 
   # 向量数据库
   chromadb:
-    image: chromadb/chroma
+    image: chromadb/chroma:0.4.24
     container_name: knowledge-base-app-chromadb
     ports:
       - "8001:8000"
