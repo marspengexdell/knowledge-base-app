@@ -14,7 +14,7 @@ class VectorDBClient:
     """
     def __init__(self):
         # 从环境变量获取ChromaDB的URL，如果获取不到则使用默认值
-        db_url_str = os.getenv("VECTOR_DB_URL", "http://weaviate:8080")
+        db_url_str = os.getenv("VECTOR_DB_URL", "http://vector-db:8000")
         logger.info(f"正在连接到向量数据库: {db_url_str}")
 
         try:
