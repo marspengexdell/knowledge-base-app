@@ -41,6 +41,12 @@ services:
     networks:
       - app-network
     restart: always
+    environment:
+      - INFERENCE_SERVER_URL=http://inference:8080
+      - VECTOR_DB_URL=http://chromadb:8000
+    depends_on:
+      - chromadb
+      - inference
 
   # 推理服务: 运行AI模型
   inference:
@@ -88,24 +94,20 @@ services:
       - app-network
 
   # 向量数据库
-  vector-db:
-    image: ghcr.io/chroma-core/chroma:latest
-    container_name: knowledge-base-app-vector-db
-    restart: unless-stopped
+  chromadb:
+    image: chromadb/chroma
+    container_name: knowledge-base-app-chromadb
     ports:
-      # 优化: 将端口映射到不常用的8001，避免冲突
       - "8001:8000"
     volumes:
-      - chroma-data:/chroma # 明确指定挂载点
+      - ./data/chroma:/chroma/chroma
     networks:
       - app-network
+    restart: on-failure:0
 
 # 定义一个全局网络，让所有服务都在同一个局域网内
 networks:
   app-network:
     driver: bridge
 
-# 定义一个持久化数据卷，用于存储ChromaDB的数据
-volumes:
-  chroma-data:
 
