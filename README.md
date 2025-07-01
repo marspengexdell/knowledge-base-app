@@ -4,11 +4,11 @@ This repository contains a simple knowledge-base system built from several servi
 
 ## Components
 
-- **backend** – FastAPI API server that exposes REST and WebSocket endpoints. It communicates with the inference service via gRPC and manages uploaded models. Environment variables are loaded from `modules/backend/.env`; `VECTOR_DB_URL` defaults to `http://vector-db:8000`.
+- **backend** – FastAPI API server that exposes REST and WebSocket endpoints. It communicates with the inference service via gRPC and manages uploaded models. Environment variables are loaded from `modules/backend/.env`; `VECTOR_DB_URL` defaults to `http://chromadb:8000`.
 - **inference** – Python gRPC server that loads language models via `llama_cpp` and performs generation and retrieval. The container runs `python app/main.py` at startup.
 - **frontend-admin** – Vue 3 interface for administrators to upload models and manage the knowledge base.
 - **frontend-user** – Vue 3 chat interface for end users.
-- **vector-db** – Chroma database container used to store vector embeddings for retrieval.
+- **chromadb** – Chroma database container used to store vector embeddings for retrieval.
 
 ## Getting Started
 
