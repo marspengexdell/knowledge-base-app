@@ -1,32 +1,29 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-import logging
-
-from services.model_management import model_service
+from fastapi import APIRouter, HTTPException
+from typing import List
+from services.model_management import model_manager
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
-@router.post("/upload")
-async def upload_model_file(file: UploadFile = File(...)):
+@router.get("/list", response_model=List)
+async def list_models():
     """
-    接收并保存上传的模型文件。
+    Returns a list of all available models discovered by the ModelManager.
     """
     try:
-        file_data = await file.read()
-        model_service.add_model(file.filename, file_data)
-        return {"success": True, "filename": file.filename, "message": "模型上传成功！"}
+        models = model_manager.list_models()
+        return models
     except Exception as e:
-        logger.error(f"上传模型文件 '{file.filename}' 时发生错误: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"上传模型失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/list")
-async def list_available_models():
+@router.post("/load/{model_name}")
+async def load_model(model_name: str):
     """
-    获取已上传的模型列表。
+    Triggers the loading of a specific model by the inference service.
     """
     try:
-        models = model_service.list_models()
-        return {"models": models}
+        success = await model_manager.load_model(model_name)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found or failed to load.")
+        return {"message": f"Model '{model_name}' is being loaded."}
     except Exception as e:
-        logger.error(f"获取模型列表时发生错误: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"获取模型列表失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
