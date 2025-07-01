@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import List, Dict, Optional
-from core.grpc_client import GRPCClient
+from core.inference_service_client import GRPCClient
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
