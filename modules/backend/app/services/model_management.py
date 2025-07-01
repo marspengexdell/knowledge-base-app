@@ -1,37 +1,91 @@
 import os
 import logging
+from typing import List, Dict, Optional
+from core.grpc_client import GRPCClient
+from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
-class ModelManagementService:
-    def __init__(self, storage_dir: str = "model_storage"):
-        """
-        初始化模型管理服务。
-        :param storage_dir: 存放上传模型文件的目录名。
-        """
-        self.storage_dir = storage_dir
-        if not os.path.exists(self.storage_dir):
-            os.makedirs(self.storage_dir)
-            logger.info(f"模型存储目录 '{self.storage_dir}' 已创建。")
+class ModelManager:
+    """
+    Manages discovering, loading, and interacting with AI models.
+    This version dynamically scans for models upon request.
+    """
 
-    def add_model(self, filename: str, file_data: bytes) -> str:
-        """
-        将上传的模型文件保存到本地。
-        """
-        file_path = os.path.join(self.storage_dir, filename)
-        with open(file_path, "wb") as f:
-            f.write(file_data)
-        logger.info(f"模型文件 '{filename}' 已保存到 '{file_path}'。")
-        return file_path
+    def __init__(self):
+        """Initializes the ModelManager."""
+        self.models_dir = "/models"  # Directory where models are stored
+        self.grpc_client = GRPCClient()
+        self.embedding_model: Optional[SentenceTransformer] = None
+        logger.info("ModelManager initialized. Model discovery will be dynamic.")
 
-    def list_models(self) -> list[str]:
+    def _discover_supported_models(self) -> List[Dict[str, str]]:
         """
-        列出所有已上传的模型文件。
+        Scans the models directory to find all supported .gguf model files.
         """
-        if not os.path.exists(self.storage_dir):
+        if not os.path.exists(self.models_dir):
+            logger.warning(f"Models directory '{self.models_dir}' not found.")
             return []
-        # 只返回文件名，不包括路径
-        return [f for f in os.listdir(self.storage_dir) if os.path.isfile(os.path.join(self.storage_dir, f))]
 
-# 创建一个全局单例
-model_service = ModelManagementService()
+        models_list = []
+        try:
+            for filename in os.listdir(self.models_dir):
+                if filename.endswith(".gguf"):
+                    model_path = os.path.join(self.models_dir, filename)
+                    models_list.append({
+                        "model_name": filename,
+                        "model_path": model_path
+                    })
+        except Exception as e:
+            logger.error(f"Error while scanning models directory '{self.models_dir}': {e}", exc_info=True)
+            return []
+
+        logger.info(f"Discovered {len(models_list)} supported models in this scan.")
+        return models_list
+
+    def list_models(self) -> List[Dict[str, str]]:
+        """Returns a fresh list of discovered models by scanning the directory now."""
+        logger.info("Dynamically scanning for models...")
+        return self._discover_supported_models()
+
+    def get_model_path(self, model_name: str) -> Optional[str]:
+        """Finds the full path of a model by its name by performing a fresh scan."""
+        for model_info in self._discover_supported_models():
+            if model_info['model_name'] == model_name:
+                return model_info['model_path']
+        logger.warning(f"Model '{model_name}' not found in '{self.models_dir}'.")
+        return None
+
+    async def load_model(self, model_name: str) -> bool:
+        """Sends a request to the inference service to load a specific model."""
+        model_path = self.get_model_path(model_name)
+        if not model_path:
+            return False
+        return await self.grpc_client.load_model(model_path)
+
+    def is_embedding_model_loaded(self) -> bool:
+        """Checks if the embedding model has been loaded into memory."""
+        return self.embedding_model is not None
+
+    async def get_embedding_model(self) -> Optional[SentenceTransformer]:
+        """
+        Loads and returns the embedding model. If already loaded, returns the existing instance.
+        """
+        if self.embedding_model:
+            return self.embedding_model
+
+        try:
+            # For now, we use a hardcoded, well-known embedding model.
+            # This could be made configurable in the future.
+            model_name = 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
+            logger.info(f"Loading embedding model: {model_name}...")
+            self.embedding_model = SentenceTransformer(model_name)
+            logger.info("Embedding model loaded successfully.")
+            return self.embedding_model
+        except Exception as e:
+            logger.error(f"Failed to load embedding model: {e}", exc_info=True)
+            self.embedding_model = None
+            return None
+
+# Create a single, shared instance of the service for the app to use
+model_manager = ModelManager()
