@@ -17,6 +17,7 @@ This repository contains a simple knowledge-base system built from several servi
 - Docker and Docker Compose installed
 - At least one `.gguf` or `.safetensors` model file under `models/` before starting (embedding model optional)
 - Python package `protobuf` version 3.20.3
+- gRPC packages pinned to version 1.48.2
 
 ### Build and Run
 
