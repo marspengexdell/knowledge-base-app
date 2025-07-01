@@ -16,8 +16,7 @@ This repository contains a simple knowledge-base system built from several servi
 
 - Docker and Docker Compose installed
 - At least one `.gguf` or `.safetensors` model file under `models/` before starting (embedding model optional)
-- Python package `protobuf` version 3.20.3
-- gRPC packages pinned to version 1.48.2
+- Python packages `protobuf`, `grpcio` and `grpcio-tools` (versions are pinned in the service requirements)
 
 ### Build and Run
 
@@ -36,9 +35,8 @@ used:
 docker compose build --no-cache backend
 ```
 
-The application depends on `protobuf` 3.20.3. If your images were built
-with a different version, rebuild all services without the Docker cache
-to avoid import errors.
+The application depends on `protobuf`. If you change the version,
+rebuild all services without the Docker cache to avoid import errors.
 
 The services will be available on the following ports:
 
