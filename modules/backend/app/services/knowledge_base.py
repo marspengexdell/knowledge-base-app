@@ -1,11 +1,8 @@
-import logging
 import os
+import logging
 from typing import List
-
 from langchain_core.documents import Document
-from sentence_transformers import SentenceTransformer
 
-from core.config import EMBEDDING_MODEL_NAME
 from core.db_client import vector_db
 from services.embedding import embedding_model
 
@@ -13,57 +10,42 @@ logger = logging.getLogger(__name__)
 
 
 class KnowledgeBaseService:
+    """Service for managing knowledge base documents."""
 
-    def __init__(self, storage_dir: str = "/knowledge_base_docs"):
-
-    def __init__(self, storage_dir: str | None = None):
-        # The directory where uploaded knowledge documents are stored.
-        # Default to '/knowledge_base_docs' so it matches the volume mount.
-        self.storage_dir = storage_dir or os.getenv(
-            "KNOWLEDGE_BASE_DOCS", "/knowledge_base_docs"
-        )
+    def __init__(self, storage_dir: str | None = None) -> None:
+        self.storage_dir = storage_dir or os.getenv("KNOWLEDGE_BASE_DOCS", "/knowledge_base_docs")
         os.makedirs(self.storage_dir, exist_ok=True)
+        logger.info(f"Knowledge base storage directory: {self.storage_dir}")
 
-
-        self.encoder = None
-        self.storage_dir = storage_dir
-        os.makedirs(self.storage_dir, exist_ok=True)
-        self._load_encoder()
-
-    def _load_encoder(self):
-        try:
-            self.encoder = SentenceTransformer(EMBEDDING_MODEL_NAME)
-            logger.info(f"成功加载嵌入模型: {EMBEDDING_MODEL_NAME}")
-        except Exception as e:
-            logger.error(f"加载嵌入模型失败: {e}", exc_info=True)
-            raise
-
-    def add_document(self, file_name: str, file_data: bytes) -> str:
-        """Save an uploaded file to the knowledge base."""
+    def add_document(self, file_name: str, file_data: bytes) -> bool:
+        """Save an uploaded document to disk."""
         file_path = os.path.join(self.storage_dir, file_name)
         with open(file_path, "wb") as f:
             f.write(file_data)
-        logger.info(f"文档 '{file_name}' 已保存到 '{file_path}'")
-        return file_path
+        logger.info(f"Document '{file_name}' saved to '{file_path}'")
+        return True
 
     async def embed_document(self, file_name: str) -> bool:
-        """Embed the specified document and store it in the vector DB."""
+        """Embed a stored document and add it to the vector database."""
         file_path = os.path.join(self.storage_dir, file_name)
         if not os.path.isfile(file_path):
             raise FileNotFoundError(file_path)
+
         with open(file_path, "rb") as f:
             data = f.read()
         try:
             text = data.decode("utf-8")
         except UnicodeDecodeError:
             text = data.decode("gbk", errors="ignore")
+
         doc = Document(page_content=text, metadata={"source": file_name})
         embedding = await embedding_model.embed(text)
         await vector_db.add_documents([doc], [embedding], file_name)
+        logger.info(f"Document '{file_name}' embedded and stored")
         return True
 
     def list_documents(self) -> List[str]:
-        """List file names stored in the knowledge base directory."""
+        """Return a list of filenames stored in the knowledge base directory."""
         return [
             f
             for f in os.listdir(self.storage_dir)
@@ -74,8 +56,8 @@ class KnowledgeBaseService:
         """List all documents stored in the vector database."""
         try:
             results = vector_db.collection.get(include=["metadatas"], limit=None)
-            sources = []
-            seen = set()
+            sources: List[dict] = []
+            seen: set[str] = set()
             for meta in results.get("metadatas", []):
                 src = meta.get("source")
                 if src and src not in seen:
@@ -83,81 +65,11 @@ class KnowledgeBaseService:
                     sources.append({"source": src})
             return sources
         except Exception as e:
-            logger.error(f"获取文档列表失败: {e}", exc_info=True)
+            logger.error(f"Failed to list documents: {e}", exc_info=True)
             return None
 
     def delete_document(self, file_name: str) -> bool:
-        """Delete a document from storage and vector database."""
-        file_path = os.path.join(self.storage_dir, file_name)
-        if not os.path.exists(file_path):
-            return False
-        os.remove(file_path)
-        vector_db.delete_documents_by_source(file_name)
-        logger.info(f"文档 '{file_name}' 已被删除")
-        return True
-
-    async def delete_documents_by_source(self, source_name: str) -> bool:
-        """Async wrapper to remove documents by source name."""
-        result = self.delete_document(source_name)
-        return result
-
-    async def add_documents(self, documents: List[Document], document_source: str):
-
-    async def add_documents(self, documents: List[Document]):
-        """Add a batch of already-created document chunks to the vector database."""
-
-        if not documents:
-            return
-        logger.info(f"准备向知识库添加 {len(documents)} 个文档...")
-        try:
-
-            texts = [d.page_content for d in documents]
-            embeddings = await embedding_model.embed_batch(texts)
-            await vector_db.add_documents(documents, embeddings, document_source)
-
-            # SentenceTransformer.encode supports batch encoding and returns a list of vectors
-            embeddings = self.encoder.encode([d.page_content for d in documents]).tolist()
-            await vector_db.add_documents(documents, embeddings, document_source="batch")
-
-            logger.info(f"成功添加 {len(documents)} 个文档到向量数据库。")
-        except Exception as e:
-            logger.error(f"添加文档到向量数据库时出错: {e}", exc_info=True)
-            raise
-
-    def list_documents(self) -> List[str]:
-        """Return a list of filenames stored in the local knowledge directory."""
-        return [
-            f
-            for f in os.listdir(self.storage_dir)
-            if os.path.isfile(os.path.join(self.storage_dir, f))
-        ]
-
-    def add_document(self, file_name: str, file_data: bytes) -> bool:
-        """Save an uploaded document to disk."""
-        file_path = os.path.join(self.storage_dir, file_name)
-        with open(file_path, "wb") as f:
-            f.write(file_data)
-        return True
-
-    async def embed_document(self, file_name: str):
-        """Vectorize a stored document and push it to the vector database."""
-        file_path = os.path.join(self.storage_dir, file_name)
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(file_name)
-
-        with open(file_path, "rb") as f:
-            content = f.read()
-        try:
-            text = content.decode("utf-8")
-        except UnicodeDecodeError:
-            text = content.decode("gbk", errors="ignore")
-
-        doc = Document(page_content=text)
-        embedding = self.encoder.encode(text).tolist()
-        await vector_db.add_documents([doc], [embedding], document_source=file_name)
-
-    def delete_document(self, file_name: str) -> bool:
-        """Remove a document from disk and the vector store."""
+        """Delete a document from disk and the vector store."""
         file_path = os.path.join(self.storage_dir, file_name)
         if not os.path.exists(file_path):
             return False
@@ -165,25 +77,39 @@ class KnowledgeBaseService:
         try:
             vector_db.delete_documents_by_source(file_name)
         except Exception:
-            logger.warning("从向量数据库删除文档失败", exc_info=True)
+            logger.warning("Failed to delete document from vector DB", exc_info=True)
+        logger.info(f"Document '{file_name}' deleted")
         return True
 
-    async def list_all_documents(self) -> List[dict]:
-        """Return a list of stored document metadata."""
-        return [{"source": name} for name in self.list_documents()]
+    async def delete_documents_by_source(self, source_name: str) -> bool:
+        """Asynchronously delete all vectors related to the given source."""
+        return self.delete_document(source_name)
+
+    async def add_documents(self, documents: List[Document], document_source: str) -> None:
+        """Add a batch of documents with embeddings to the vector database."""
+        if not documents:
+            return
+        try:
+            texts = [d.page_content for d in documents]
+            embeddings = await embedding_model.embed_batch(texts)
+            await vector_db.add_documents(documents, embeddings, document_source)
+            logger.info(f"Added {len(documents)} documents from '{document_source}'")
+        except Exception as e:
+            logger.error(f"Error adding documents: {e}", exc_info=True)
+            raise
 
     async def search(self, query: str, n_results: int = 3) -> List[Document]:
-        """Search the vector database for documents relevant to ``query``."""
-        logger.info(f"在知识库中搜索查询: '{query}' (请求 {n_results} 个结果)")
+        """Search the knowledge base for relevant documents."""
         try:
-            query_vector = self.encoder.encode(query).tolist()
-            results = await vector_db.search_with_vector(query_vector, top_k=n_results)
-            logger.info(f"为查询 '{query}' 找到了 {len(results)} 个相关文档。")
+            query_embedding = await embedding_model.embed(query)
+            if not query_embedding:
+                return []
+            results = await vector_db.search_with_vector(query_embedding, top_k=n_results)
+            logger.info(f"Found {len(results)} documents for query '{query}'")
             return results
         except Exception as e:
-            logger.error(f"知识库搜索失败: {e}", exc_info=True)
+            logger.error(f"Knowledge base search failed: {e}", exc_info=True)
             return []
 
 
 kb_service = KnowledgeBaseService()
-
