@@ -31,6 +31,7 @@ services:
     env_file: ./modules/backend/.env
     volumes:
       - ./modules/backend/app:/app
+      - ./knowledge_base_docs:/knowledge_base_docs
     ports:
       - "8000:8000"
     networks:
