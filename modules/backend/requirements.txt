@@ -4,18 +4,16 @@ pydantic==2.7.1
 requests==2.31.0
 sqlmodel==0.0.16
 python-dotenv==1.0.1
-grpcio==1.48.2
-grpcio-tools==1.48.2
+grpcio>=1.58.0
+grpcio-tools>=1.58.0
 websockets==12.0
 pydantic-settings==2.1.0
 python-multipart==0.0.9
-protobuf==3.20.3
+protobuf
 sentence-transformers>=2.3.0
 torch>=1.10.0
 numpy
 chromadb==0.4.24
-
-# Additional libraries for document processing
 langchain-community
 unstructured
 python-docx
