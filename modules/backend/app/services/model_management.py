@@ -1,7 +1,8 @@
 import os
 import logging
 from typing import List, Dict, Optional
-from core.inference_service_client import GRPCClient
+from core.grpc_client import grpc_client_manager
+from protos import inference_pb2
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ class ModelManager:
     def __init__(self):
         """Initializes the ModelManager."""
         self.models_dir = "/models"  # Directory where models are stored
-        self.grpc_client = GRPCClient()
+        self.grpc_client_manager = grpc_client_manager
         self.embedding_model: Optional[SentenceTransformer] = None
         logger.info("ModelManager initialized. Model discovery will be dynamic.")
 
@@ -57,11 +58,14 @@ class ModelManager:
         return None
 
     async def load_model(self, model_name: str) -> bool:
-        """Sends a request to the inference service to load a specific model."""
+        """Request the inference service to switch to the specified model."""
         model_path = self.get_model_path(model_name)
         if not model_path:
             return False
-        return await self.grpc_client.load_model(model_path)
+        success, _ = await self.grpc_client_manager.switch_model(
+            model_name, inference_pb2.ModelType.GENERATION
+        )
+        return success
 
     def is_embedding_model_loaded(self) -> bool:
         """Checks if the embedding model has been loaded into memory."""
