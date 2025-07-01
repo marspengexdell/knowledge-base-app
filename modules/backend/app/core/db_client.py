@@ -3,6 +3,7 @@ import logging
 import chromadb
 from langchain_core.documents import Document
 from typing import List
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -13,18 +14,29 @@ class VectorDBClient:
     """
     def __init__(self):
         # 从环境变量获取ChromaDB的URL，如果获取不到则使用默认值
-        db_url = os.getenv("VECTOR_DB_URL", "http://localhost:8001")
-        logger.info(f"正在连接到向量数据库: {db_url}")
-        
+        db_url_str = os.getenv("VECTOR_DB_URL", "http://weaviate:8080")
+        logger.info(f"正在连接到向量数据库: {db_url_str}")
+
         try:
+            # --- 代码修复开始 ---
+            # 解析 URL 以分离出 host 和 port
+            parsed_url = urlparse(db_url_str)
+            db_host = parsed_url.hostname
+            db_port = parsed_url.port
+
+            if not db_host or not db_port:
+                raise ValueError("无效的 VECTOR_DB_URL，无法解析 host 或 port")
+
             # 初始化ChromaDB HTTP客户端
-            # 我们将使用持久化存储，确保数据在容器重启后不丢失
+            # 使用新的 host 和 port 参数
             self.client = chromadb.HttpClient(
-                url=db_url,
+                host=db_host,
+                port=db_port,
                 settings=chromadb.Settings(
                     is_persistent=True,
                 )
             )
+            # --- 代码修复结束 ---
             
             # 定义一个统一的集合名称，所有文档都将存储在这里
             self.collection_name = "knowledge_base_main_collection"
