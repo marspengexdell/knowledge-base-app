@@ -28,6 +28,7 @@ services:
       context: ./modules/backend
       dockerfile: Dockerfile
     container_name: knowledge-base-app-backend
+    env_file: ./modules/backend/.env
     volumes:
       - ./modules/backend/app:/app
     ports:
