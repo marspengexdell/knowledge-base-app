@@ -53,6 +53,7 @@ const msgList = ref(null)
 const ws = ref(null)
 const wsError = ref('')
 const partialAIMessage = ref('')
+const sessionId = ref(localStorage.getItem('kb_session_id') || '')
 
 function scrollToBottom() {
   nextTick(() => {
@@ -76,18 +77,33 @@ function connectWS() {
     setTimeout(connectWS, 2000) // 自动重连
   }
   ws.value.onmessage = (event) => {
-    // AI回复的每个片段
-    if (loading.value) {
-      if (event.data === '[DONE]') {
+    try {
+      const data = JSON.parse(event.data)
+      if (data.session_id) {
+        sessionId.value = data.session_id
+        localStorage.setItem('kb_session_id', sessionId.value)
+      }
+
+      if (data.event === '[ID]') {
+        return
+      }
+
+      if (data.event === '[DONE]') {
         if (partialAIMessage.value) {
           messages.value.push({ role: 'ai', content: partialAIMessage.value })
         }
         loading.value = false
         partialAIMessage.value = ''
-      } else {
-        partialAIMessage.value += event.data
+        scrollToBottom()
+        return
       }
-      scrollToBottom()
+
+      if (data.token) {
+        partialAIMessage.value += data.token
+        scrollToBottom()
+      }
+    } catch (e) {
+      console.error('消息解析失败', e)
     }
   }
 }
@@ -115,7 +131,8 @@ async function handleSend() {
   scrollToBottom()
   // 通过ws发送
   try {
-    ws.value.send(userMsg)
+    const payload = JSON.stringify({ query: userMsg, session_id: sessionId.value })
+    ws.value.send(payload)
   } catch (e) {
     loading.value = false
     wsError.value = 'AI服务通信异常'
