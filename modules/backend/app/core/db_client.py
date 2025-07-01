@@ -5,6 +5,8 @@ from langchain_core.documents import Document
 from typing import List
 from urllib.parse import urlparse
 
+from services.embedding import embedding_model
+
 logger = logging.getLogger(__name__)
 
 class VectorDBClient:
@@ -93,6 +95,17 @@ class VectorDBClient:
             return found_docs
         except Exception as e:
             logger.error(f"在向量数据库中通过向量搜索时出错: {e}", exc_info=True)
+            return []
+
+    async def asimilarity_search(self, query: str, k: int = 3) -> List[Document]:
+        """Compute the embedding for a query and search the vector DB."""
+        try:
+            query_embedding = await embedding_model.embed(query)
+            if not query_embedding:
+                return []
+            return await self.search_with_vector(query_embedding, k)
+        except Exception as e:
+            logger.error(f"相似度搜索失败: {e}", exc_info=True)
             return []
 
     def delete_documents_by_source(self, source: str):
