@@ -8,7 +8,10 @@ def detect_gpu_presence() -> bool:
     """Return True if a NVIDIA GPU is available."""
     try:
         subprocess.run(
-            ["nvidia-smi"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            ["nvidia-smi"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
         return True
     except Exception:

@@ -15,25 +15,25 @@ class InferenceServiceStub(object):
             channel: A grpc.Channel.
         """
         self.ChatStream = channel.unary_stream(
-                '/inference.InferenceService/ChatStream',
-                request_serializer=inference__pb2.ChatRequest.SerializeToString,
-                response_deserializer=inference__pb2.ChatResponse.FromString,
-                )
+            "/inference.InferenceService/ChatStream",
+            request_serializer=inference__pb2.ChatRequest.SerializeToString,
+            response_deserializer=inference__pb2.ChatResponse.FromString,
+        )
         self.ListAvailableModels = channel.unary_unary(
-                '/inference.InferenceService/ListAvailableModels',
-                request_serializer=inference__pb2.Empty.SerializeToString,
-                response_deserializer=inference__pb2.ModelListResponse.FromString,
-                )
+            "/inference.InferenceService/ListAvailableModels",
+            request_serializer=inference__pb2.Empty.SerializeToString,
+            response_deserializer=inference__pb2.ModelListResponse.FromString,
+        )
         self.SwitchModel = channel.unary_unary(
-                '/inference.InferenceService/SwitchModel',
-                request_serializer=inference__pb2.SwitchModelRequest.SerializeToString,
-                response_deserializer=inference__pb2.SwitchModelResponse.FromString,
-                )
+            "/inference.InferenceService/SwitchModel",
+            request_serializer=inference__pb2.SwitchModelRequest.SerializeToString,
+            response_deserializer=inference__pb2.SwitchModelResponse.FromString,
+        )
         self.GetEmbeddingsBatch = channel.unary_unary(
-                '/inference.InferenceService/GetEmbeddingsBatch',
-                request_serializer=inference__pb2.EmbeddingBatchRequest.SerializeToString,
-                response_deserializer=inference__pb2.EmbeddingBatchResponse.FromString,
-                )
+            "/inference.InferenceService/GetEmbeddingsBatch",
+            request_serializer=inference__pb2.EmbeddingBatchRequest.SerializeToString,
+            response_deserializer=inference__pb2.EmbeddingBatchResponse.FromString,
+        )
 
 
 class InferenceServiceServicer(object):
@@ -42,124 +42,173 @@ class InferenceServiceServicer(object):
     def ChatStream(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def ListAvailableModels(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def SwitchModel(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def GetEmbeddingsBatch(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
 
 def add_InferenceServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'ChatStream': grpc.unary_stream_rpc_method_handler(
-                    servicer.ChatStream,
-                    request_deserializer=inference__pb2.ChatRequest.FromString,
-                    response_serializer=inference__pb2.ChatResponse.SerializeToString,
-            ),
-            'ListAvailableModels': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListAvailableModels,
-                    request_deserializer=inference__pb2.Empty.FromString,
-                    response_serializer=inference__pb2.ModelListResponse.SerializeToString,
-            ),
-            'SwitchModel': grpc.unary_unary_rpc_method_handler(
-                    servicer.SwitchModel,
-                    request_deserializer=inference__pb2.SwitchModelRequest.FromString,
-                    response_serializer=inference__pb2.SwitchModelResponse.SerializeToString,
-            ),
-            'GetEmbeddingsBatch': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetEmbeddingsBatch,
-                    request_deserializer=inference__pb2.EmbeddingBatchRequest.FromString,
-                    response_serializer=inference__pb2.EmbeddingBatchResponse.SerializeToString,
-            ),
+        "ChatStream": grpc.unary_stream_rpc_method_handler(
+            servicer.ChatStream,
+            request_deserializer=inference__pb2.ChatRequest.FromString,
+            response_serializer=inference__pb2.ChatResponse.SerializeToString,
+        ),
+        "ListAvailableModels": grpc.unary_unary_rpc_method_handler(
+            servicer.ListAvailableModels,
+            request_deserializer=inference__pb2.Empty.FromString,
+            response_serializer=inference__pb2.ModelListResponse.SerializeToString,
+        ),
+        "SwitchModel": grpc.unary_unary_rpc_method_handler(
+            servicer.SwitchModel,
+            request_deserializer=inference__pb2.SwitchModelRequest.FromString,
+            response_serializer=inference__pb2.SwitchModelResponse.SerializeToString,
+        ),
+        "GetEmbeddingsBatch": grpc.unary_unary_rpc_method_handler(
+            servicer.GetEmbeddingsBatch,
+            request_deserializer=inference__pb2.EmbeddingBatchRequest.FromString,
+            response_serializer=inference__pb2.EmbeddingBatchResponse.SerializeToString,
+        ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'inference.InferenceService', rpc_method_handlers)
+        "inference.InferenceService", rpc_method_handlers
+    )
     server.add_generic_rpc_handlers((generic_handler,))
 
 
- # This class is part of an EXPERIMENTAL API.
+# This class is part of an EXPERIMENTAL API.
 class InferenceService(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def ChatStream(request,
+    def ChatStream(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_stream(
+            request,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/inference.InferenceService/ChatStream',
+            "/inference.InferenceService/ChatStream",
             inference__pb2.ChatRequest.SerializeToString,
             inference__pb2.ChatResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
 
     @staticmethod
-    def ListAvailableModels(request,
+    def ListAvailableModels(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/inference.InferenceService/ListAvailableModels',
+            "/inference.InferenceService/ListAvailableModels",
             inference__pb2.Empty.SerializeToString,
             inference__pb2.ModelListResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
 
     @staticmethod
-    def SwitchModel(request,
+    def SwitchModel(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/inference.InferenceService/SwitchModel',
+            "/inference.InferenceService/SwitchModel",
             inference__pb2.SwitchModelRequest.SerializeToString,
             inference__pb2.SwitchModelResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
 
     @staticmethod
-    def GetEmbeddingsBatch(request,
+    def GetEmbeddingsBatch(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/inference.InferenceService/GetEmbeddingsBatch',
+            "/inference.InferenceService/GetEmbeddingsBatch",
             inference__pb2.EmbeddingBatchRequest.SerializeToString,
             inference__pb2.EmbeddingBatchResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )

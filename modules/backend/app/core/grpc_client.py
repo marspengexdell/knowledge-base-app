@@ -7,6 +7,7 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
+
 class GrpcClientManager:
     def __init__(self):
         self.channel = None
@@ -54,12 +55,15 @@ class GrpcClientManager:
             "embedding_models": list(resp.embedding_models),
             "current_generation_model": resp.current_generation_model,
             "current_embedding_model": resp.current_embedding_model,
-            "device": getattr(resp, "device", "")
+            "device": getattr(resp, "device", ""),
         }
 
     async def switch_model(self, model_name: str, model_type_enum):
-        req = inference_pb2.SwitchModelRequest(model_name=model_name, model_type=model_type_enum)
+        req = inference_pb2.SwitchModelRequest(
+            model_name=model_name, model_type=model_type_enum
+        )
         resp = await self.stub.SwitchModel(req)
         return resp.success, resp.message
+
 
 grpc_client_manager = GrpcClientManager()
