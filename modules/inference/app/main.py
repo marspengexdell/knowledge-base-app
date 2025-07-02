@@ -17,7 +17,7 @@ from diskcache import Cache
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s %(threadName)s %(name)s %(levelname)s %(message)s'
+    format="%(asctime)s %(threadName)s %(name)s %(levelname)s %(message)s",
 )
 logger = logging.getLogger(__name__)
 MODELS_PATH = "/models/"
@@ -29,26 +29,38 @@ class ModelStatus(Enum):
     READY = "READY"
     ERROR = "ERROR"
 
+
 def detect_model_type(model_name, loaded_model=None):
     lower = model_name.lower()
-    if "qwen" in lower: return "qwen"
-    elif "yi" in lower: return "yi"
-    elif "baichuan" in lower: return "baichuan"
-    elif "deepseek" in lower: return "deepseek"
-    elif "llama-3" in lower: return "llama-3"
-    elif "llama-2" in lower: return "llama-2"
+    if "qwen" in lower:
+        return "qwen"
+    elif "yi" in lower:
+        return "yi"
+    elif "baichuan" in lower:
+        return "baichuan"
+    elif "deepseek" in lower:
+        return "deepseek"
+    elif "llama-3" in lower:
+        return "llama-3"
+    elif "llama-2" in lower:
+        return "llama-2"
     elif loaded_model and hasattr(loaded_model, "chat_format"):
         cf = getattr(loaded_model, "chat_format")
-        if isinstance(cf, str): return cf.lower()
+        if isinstance(cf, str):
+            return cf.lower()
     return "llama"
+
 
 def build_prompt_qwen(messages):
     prompt = ""
     for msg in messages:
-        if msg['role'] == 'user': prompt += f"<|im_start|>user\n{msg['content']}<|im_end|>\n"
-        elif msg['role'] == 'assistant': prompt += f"<|im_start|>assistant\n{msg['content']}<|im_end|>\n"
+        if msg["role"] == "user":
+            prompt += f"<|im_start|>user\n{msg['content']}<|im_end|>\n"
+        elif msg["role"] == "assistant":
+            prompt += f"<|im_start|>assistant\n{msg['content']}<|im_end|>\n"
     prompt += "<|im_start|>assistant\n"
     return prompt
+
 
 class ModelManager:
     _instance = None
@@ -85,24 +97,29 @@ class ModelManager:
                 self.status = ModelStatus.LOADING
                 self.error_message = ""
                 self.model_type = None
-            
+
             model_path = os.path.join(MODELS_PATH, new_model_name)
             n_gpu_layers = -1 if IS_GPU_AVAILABLE else 0
-            logger.info(f"加载模型 {new_model_name} 到 {'GPU' if IS_GPU_AVAILABLE else 'CPU'}")
-            
-            chat_format = None
-            if "qwen" in new_model_name.lower(): chat_format = "chatml"
-            elif "llama-3" in new_model_name.lower(): chat_format = "llama-3"
-            elif "llama-2" in new_model_name.lower(): chat_format = "llama-2"
-            
-            new_model = Llama(
-                model_path=model_path, 
-                n_ctx=8192, 
-                n_gpu_layers=n_gpu_layers, 
-                chat_format=chat_format, 
-                verbose=True
+            logger.info(
+                f"加载模型 {new_model_name} 到 {'GPU' if IS_GPU_AVAILABLE else 'CPU'}"
             )
-            
+
+            chat_format = None
+            if "qwen" in new_model_name.lower():
+                chat_format = "chatml"
+            elif "llama-3" in new_model_name.lower():
+                chat_format = "llama-3"
+            elif "llama-2" in new_model_name.lower():
+                chat_format = "llama-2"
+
+            new_model = Llama(
+                model_path=model_path,
+                n_ctx=8192,
+                n_gpu_layers=n_gpu_layers,
+                chat_format=chat_format,
+                verbose=True,
+            )
+
             with self.lock:
                 self.model = new_model
                 self.model_type = detect_model_type(new_model_name, new_model)
@@ -118,8 +135,10 @@ class ModelManager:
 
     def _load_embedding_model(self):
         try:
-            embed_model_path = os.path.join(MODELS_PATH, "embedding-model", "BAAI/bge-base-zh-v1.5")
-            if not os.path.isdir(embed_model_path): 
+            embed_model_path = os.path.join(
+                MODELS_PATH, "embedding-model", "BAAI/bge-base-zh-v1.5"
+            )
+            if not os.path.isdir(embed_model_path):
                 embed_model_path = "BAAI/bge-base-zh-v1.5"
             device = "cuda" if IS_GPU_AVAILABLE else "cpu"
             self.embedding_model = SentenceTransformer(embed_model_path, device=device)
@@ -137,10 +156,16 @@ class ModelManager:
             if not os.path.exists(os.path.join(MODELS_PATH, new_model_name)):
                 return {"status": "error", "message": "模型不存在"}
 
-            threading.Thread(target=self._load_model_in_background, args=(new_model_name,), daemon=True).start()
+            threading.Thread(
+                target=self._load_model_in_background,
+                args=(new_model_name,),
+                daemon=True,
+            ).start()
             return {"status": "loading_started", "name": new_model_name}
 
-    def compress_history(self, messages: list[dict], max_length: int = 4096, keep_last: int = 4) -> list[dict]:
+    def compress_history(
+        self, messages: list[dict], max_length: int = 4096, keep_last: int = 4
+    ) -> list[dict]:
         total_len = sum(len(msg["content"]) for msg in messages)
 
         if total_len <= max_length:
@@ -149,14 +174,16 @@ class ModelManager:
         logger.info("Context length exceeded, compressing history...")
         to_summarize = messages[:-keep_last]
 
-        summary_prompt = "请用一段话精简地总结以下对话的核心内容，以便我能理解后续对话的背景:\n"
+        summary_prompt = (
+            "请用一段话精简地总结以下对话的核心内容，以便我能理解后续对话的背景:\n"
+        )
         for msg in to_summarize:
             summary_prompt += f"{msg['role']}: {msg['content']}\n"
 
         response = self.model.create_chat_completion(
             messages=[{"role": "user", "content": summary_prompt}],
             temperature=0.2,
-            max_tokens=256
+            max_tokens=256,
         )
         summary_text = response["choices"][0]["message"]["content"]
 
@@ -192,42 +219,53 @@ class ModelManager:
 
         self.cache[cache_key] = full_response
 
+
 model_manager = ModelManager()
+
 
 class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
     def ListAvailableModels(self, request, context):
         gen, emb = [], []
         try:
             for f in os.listdir(MODELS_PATH):
-                if f.endswith('.gguf'):
+                if f.endswith(".gguf"):
                     (emb if "embed" in f.lower() else gen).append(f)
         except FileNotFoundError:
             logger.warning(f"模型目录 {MODELS_PATH} 未找到。")
-        
+
         embed_dir = os.path.join(MODELS_PATH, "embedding-model")
         if os.path.isdir(embed_dir):
             for sub in os.listdir(embed_dir):
                 emb.append(os.path.join("embedding-model", sub))
 
-        current_gen = model_manager.model_name if model_manager.status in (ModelStatus.READY, ModelStatus.LOADING) else ""
+        current_gen = (
+            model_manager.model_name
+            if model_manager.status in (ModelStatus.READY, ModelStatus.LOADING)
+            else ""
+        )
         current_emb = model_manager.embedding_model_name or (emb[0] if emb else "")
         device = "GPU" if IS_GPU_AVAILABLE else "CPU"
-        
+
         return inference_pb2.ModelListResponse(
             generation_models=gen,
             embedding_models=emb,
             current_generation_model=current_gen,
             current_embedding_model=current_emb,
-            device=device
+            device=device,
         )
 
     def SwitchModel(self, request, context):
         res = model_manager.switch_model(request.model_name)
-        return inference_pb2.SwitchModelResponse(success=res["status"] in ("loading_started", "already_loaded"), message=res.get("message", ""))
+        return inference_pb2.SwitchModelResponse(
+            success=res["status"] in ("loading_started", "already_loaded"),
+            message=res.get("message", ""),
+        )
 
     def ChatStream(self, request, context):
         try:
-            messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+            messages = [
+                {"role": msg.role, "content": msg.content} for msg in request.messages
+            ]
             for token in model_manager.infer_stream(messages):
                 yield inference_pb2.ChatResponse(token=token)
         except Exception as e:
@@ -240,43 +278,57 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
             context.set_details("嵌入模型未加载。")
             return inference_pb2.EmbeddingBatchResponse()
         try:
-            vectors = model_manager.embedding_model.encode(request.texts, normalize_embeddings=True)
-            return inference_pb2.EmbeddingBatchResponse(embeddings=[inference_pb2.Embedding(values=v.tolist()) for v in vectors])
+            vectors = model_manager.embedding_model.encode(
+                request.texts, normalize_embeddings=True
+            )
+            return inference_pb2.EmbeddingBatchResponse(
+                embeddings=[inference_pb2.Embedding(values=v.tolist()) for v in vectors]
+            )
         except Exception as e:
             logger.error(f"生成嵌入向量时出错: {e}", exc_info=True)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f"生成嵌入向量时出错: {e}")
             return inference_pb2.EmbeddingBatchResponse()
 
+
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    inference_pb2_grpc.add_InferenceServiceServicer_to_server(InferenceService(), server)
-    
+    inference_pb2_grpc.add_InferenceServiceServicer_to_server(
+        InferenceService(), server
+    )
+
     SERVICE_NAMES = (
-        inference_pb2.DESCRIPTOR.services_by_name['InferenceService'].full_name,
+        inference_pb2.DESCRIPTOR.services_by_name["InferenceService"].full_name,
         reflection.SERVICE_NAME,
     )
     reflection.enable_server_reflection(SERVICE_NAMES, server)
-    
-    server.add_insecure_port('[::]:50051')
+
+    server.add_insecure_port("[::]:50051")
     server.start()
     logger.info("gRPC 服务器已启动，监听端口 50051")
-    
+
     # 启动时加载嵌入模型和默认的生成模型
     threading.Thread(target=model_manager._load_embedding_model, daemon=True).start()
     try:
-        available = sorted([f for f in os.listdir(MODELS_PATH) if f.endswith('.gguf') and "embed" not in f.lower()])
+        available = sorted(
+            [
+                f
+                for f in os.listdir(MODELS_PATH)
+                if f.endswith(".gguf") and "embed" not in f.lower()
+            ]
+        )
         if available:
             model_manager.switch_model(available[0])
     except FileNotFoundError:
         logger.error(f"模型目录 {MODELS_PATH} 不存在，无法加载默认模型。")
-    
+
     try:
         while True:
-            time.sleep(86400) # 一天的秒数
+            time.sleep(86400)  # 一天的秒数
     except KeyboardInterrupt:
         logger.info("收到关闭信号，正在停止服务器...")
         server.stop(0)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     serve()
