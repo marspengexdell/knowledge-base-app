@@ -10,9 +10,6 @@ websockets==12.0
 pydantic-settings==2.1.0
 python-multipart==0.0.9
 protobuf
-sentence-transformers>=2.3.0
-torch>=1.10.0
-numpy
 chromadb==0.4.24
 langchain-community
 unstructured

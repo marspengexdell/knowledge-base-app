@@ -1,25 +1,36 @@
 import grpc
 from concurrent import futures
-from llama_cpp import Llama
-from sentence_transformers import SentenceTransformer
-import app.protos.inference_pb2 as inference_pb2
-import app.protos.inference_pb2_grpc as inference_pb2_grpc
-from grpc_reflection.v1alpha import reflection
 import os
 import logging
 import threading
 import time
-from app.utils import IS_GPU_AVAILABLE
-from app.config import MAX_TOKENS, EARLY_STOP_TOKENS
-from enum import Enum
 import json
+from enum import Enum
+
+# 导入 gRPC 生成的代码 (修正了路径)
+import protos.inference_pb2 as inference_pb2
+import protos.inference_pb2_grpc as inference_pb2_grpc
+from grpc_reflection.v1alpha import reflection
+
+# 导入项目模块 (修正了路径)
+# 假设 config.py 和 utils.py 与 main.py 在同一个 app 文件夹下
+from config import MAX_TOKENS, EARLY_STOP_TOKENS
+from utils import IS_GPU_AVAILABLE
+
+# 导入第三方库
+from llama_cpp import Llama
+from sentence_transformers import SentenceTransformer
 from diskcache import Cache
 
+# --- 日志记录配置 ---
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(threadName)s %(name)s %(levelname)s %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# --- 常量 ---
+# 这个路径将从 docker-compose.yml 中挂载
 MODELS_PATH = "/models/"
 
 
@@ -84,7 +95,7 @@ class ModelManager:
         self.embedding_model = None
         self.embedding_model_name = ""
         self.lock = threading.Lock()
-        self.cache = Cache(".cache")
+        self.cache = Cache("/app/.cache") # 将缓存放在 app 目录下
         self.initialized = True
         logger.info("模型管理器初始化完成。")
 
@@ -135,11 +146,15 @@ class ModelManager:
 
     def _load_embedding_model(self):
         try:
+            # 优先从本地挂载的 /models 目录加载，如果不存在，则从 HuggingFace 下载
+            # 注意：这需要你将模型文件夹命名为 'BAAI/bge-base-zh-v1.5'
             embed_model_path = os.path.join(
-                MODELS_PATH, "embedding-model", "BAAI/bge-base-zh-v1.5"
+                MODELS_PATH, "embedding-model"
             )
             if not os.path.isdir(embed_model_path):
-                embed_model_path = "BAAI/bge-base-zh-v1.5"
+                 logger.warning(f"本地嵌入模型目录 {embed_model_path} 未找到，将从 HuggingFace 下载。")
+                 embed_model_path = "BAAI/bge-base-zh-v1.5"
+
             device = "cuda" if IS_GPU_AVAILABLE else "cpu"
             self.embedding_model = SentenceTransformer(embed_model_path, device=device)
             self.embedding_model_name = "BAAI/bge-base-zh-v1.5"
@@ -225,32 +240,27 @@ model_manager = ModelManager()
 
 class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
     def ListAvailableModels(self, request, context):
-        gen, emb = [], []
+        gen_models = []
         try:
-            for f in os.listdir(MODELS_PATH):
-                if f.endswith(".gguf"):
-                    (emb if "embed" in f.lower() else gen).append(f)
+            if os.path.isdir(MODELS_PATH):
+                for f in os.listdir(MODELS_PATH):
+                    if f.endswith(".gguf"):
+                        gen_models.append(f)
         except FileNotFoundError:
             logger.warning(f"模型目录 {MODELS_PATH} 未找到。")
-
-        embed_dir = os.path.join(MODELS_PATH, "embedding-model")
-        if os.path.isdir(embed_dir):
-            for sub in os.listdir(embed_dir):
-                emb.append(os.path.join("embedding-model", sub))
 
         current_gen = (
             model_manager.model_name
             if model_manager.status in (ModelStatus.READY, ModelStatus.LOADING)
             else ""
         )
-        current_emb = model_manager.embedding_model_name or (emb[0] if emb else "")
         device = "GPU" if IS_GPU_AVAILABLE else "CPU"
 
         return inference_pb2.ModelListResponse(
-            generation_models=gen,
-            embedding_models=emb,
+            generation_models=gen_models,
+            embedding_models=[model_manager.embedding_model_name],
             current_generation_model=current_gen,
-            current_embedding_model=current_emb,
+            current_embedding_model=model_manager.embedding_model_name,
             device=device,
         )
 
@@ -270,6 +280,8 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
                 yield inference_pb2.ChatResponse(token=token)
         except Exception as e:
             logger.error(f"Chat 异常: {e}", exc_info=True)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
             yield inference_pb2.ChatResponse(error_message=str(e))
 
     def GetEmbeddingsBatch(self, request, context):
@@ -310,15 +322,19 @@ def serve():
     # 启动时加载嵌入模型和默认的生成模型
     threading.Thread(target=model_manager._load_embedding_model, daemon=True).start()
     try:
-        available = sorted(
-            [
-                f
-                for f in os.listdir(MODELS_PATH)
-                if f.endswith(".gguf") and "embed" not in f.lower()
-            ]
-        )
-        if available:
-            model_manager.switch_model(available[0])
+        if os.path.isdir(MODELS_PATH):
+            available = sorted(
+                [
+                    f
+                    for f in os.listdir(MODELS_PATH)
+                    if f.endswith(".gguf")
+                ]
+            )
+            if available:
+                logger.info(f"找到默认模型，正在加载: {available[0]}")
+                model_manager.switch_model(available[0])
+            else:
+                logger.warning(f"模型目录 {MODELS_PATH} 中没有找到 .gguf 模型文件。")
     except FileNotFoundError:
         logger.error(f"模型目录 {MODELS_PATH} 不存在，无法加载默认模型。")
 

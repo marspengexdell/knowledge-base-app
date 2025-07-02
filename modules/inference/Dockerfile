@@ -1,64 +1,47 @@
-# 基础镜像：CUDA + Python + 工具
-# 使用了多阶段构建，以保持最终镜像的整洁
-FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04 AS base
+# 使用官方的 NVIDIA CUDA 基础镜像
+FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
-# 安装基础环境和构建工具
+# 1. 安装系统依赖
+# 更新包列表并安装 Python、pip 和编译工具
 RUN apt-get update && apt-get install -y \
-    build-essential python3.10 python3-pip \
-    git cmake dos2unix \
-    && rm -rf /var/lib/apt/lists/* \
-    # 配置 CUDA 库路径
-    && echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/cuda.conf && ldconfig
+    python3.10 \
+    python3-pip \
+    git \
+    cmake \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# 第二阶段：安装 Python 依赖
-FROM base AS deps
-
-WORKDIR /app
-COPY requirements.txt .
-
-# 升级 pip 并安装所有依赖
-# - CMAKE_ARGS 和 FORCE_CMAKE 用于确保 llama-cpp-python 编译时启用 GPU 支持
-# - --no-cache-dir 避免缓存，确保每次都全新安装
-RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/libcuda.so \
-    && ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/libcuda.so.1 \
-    && export LD_LIBRARY_PATH="/usr/local/cuda/lib64/stubs:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" \
-    && python3 -m pip install --upgrade pip \
-    && export CMAKE_ARGS="-DGGML_CUDA=on" \
-    && export FORCE_CMAKE=1 \
-    && pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-# ★ 新增的调试步骤 ★
-# 打印所有已安装的 Python 包及其版本到构建日志中
-# 这可以帮助我们确认 llama-cpp-python 的确切版本
-RUN pip freeze
-
-# 第三阶段：构建最终镜像
-FROM base AS final
-
+# 2. 设置工作目录
 WORKDIR /app
 
-# 从依赖阶段拷贝已安装的库文件
-COPY --from=deps /usr/local/lib/python3.10/dist-packages/ /usr/local/lib/python3.10/dist-packages/
-COPY --from=deps /usr/local/bin/ /usr/local/bin/
+# 3. 复制并安装 Python 依赖
+# 首先只复制依赖文件以利用 Docker 缓存
+COPY ./modules/inference/requirements.txt .
 
-# 拷贝你的应用代码
-COPY app /app/app
+# 设置环境变量，强制 llama-cpp-python 在编译时启用 CUDA
+ENV CMAKE_ARGS="-DGGML_CUDA=on"
+ENV FORCE_CMAKE=1
 
-# 进入 app 目录编译 gRPC protos 文件
-WORKDIR /app/app
-RUN touch protos/__init__.py \
- && python3 -m grpc_tools.protoc -I=protos \
-    --python_out=protos --grpc_python_out=protos \
-    protos/inference.proto
+# 安装所有 Python 依赖
+# pip 会首先读取 requirements.txt 中的 --index-url 来安装 torch
+RUN python3 -m pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# 设置工作目录和 Python 路径
-WORKDIR /app
+# 4. 复制 .proto 文件
+# 确保 docker-compose.yml 中的构建上下文是项目根目录 (context: .)
+COPY ./protos ./protos
+
+# 5. 编译 .proto 文件为 Python 代码
+RUN python3 -m grpc_tools.protoc -I./protos --python_out=. --grpc_python_out=. ./protos/*.proto
+
+# 6. 复制应用代码
+COPY ./modules/inference/app ./app
+
+# 7. 设置 Python 路径，以便能正确找到模块
 ENV PYTHONPATH="${PYTHONPATH}:/app"
 
+# 暴露 gRPC 服务的端口
 EXPOSE 50051
 
-# 启动 gRPC 服务 (这里假设你的主入口是 main.py 里的 app 对象)
-# 注意：你的原始 CMD 是 `python3 -m app.main`。如果你的服务是用 uvicorn 启动的，
-# 请使用 `CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "50051"]`
-# 否则，保持原样即可。
+# 启动应用的命令
 CMD ["python3", "-m", "app.main"]

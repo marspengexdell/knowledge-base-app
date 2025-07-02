@@ -1,9 +1,20 @@
+# 指定 PyTorch 的安装源，确保下载与 CUDA 12.1 兼容的版本
+--index-url https://download.pytorch.org/whl/cu121
+
+# PyTorch 核心库
+torch
+
+# 基础库
 numpy==1.26.4
-grpcio>=1.58.0
-grpcio-tools>=1.58.0
 protobuf
 transformers
 sentence-transformers==2.6.1
-grpcio-reflection
-llama-cpp-python>=0.2.90
 diskcache>=5.6.1
+
+# gRPC 相关
+grpcio>=1.58.0
+grpcio-tools>=1.58.0
+grpcio-reflection
+
+# Llama 相关，带 GPU 支持
+llama-cpp-python[server]>=0.2.90
