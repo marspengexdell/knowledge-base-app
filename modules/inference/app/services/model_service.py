@@ -9,7 +9,10 @@ from app.config import MAX_TOKENS, EARLY_STOP_TOKENS
 DEFAULT_MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "150"))
 STOP_TOKEN = os.getenv("STOP_TOKEN")
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 class RAGService:
     def __init__(self, model_dir, embed_model_dir, db_path):
@@ -18,7 +21,7 @@ class RAGService:
         self.db_path = db_path
 
         self.generation_model = None
-        self.chat_handler = None      # 新增
+        self.chat_handler = None  # 新增
         self.embedding_model = None
 
         self.current_generation_model_name = None
@@ -43,16 +46,15 @@ class RAGService:
         if not self.current_generation_model_name:
             logging.error("没有指定生成模型名称。")
             return
-        model_path = self.find_model_path(self.current_generation_model_name, self.model_dir)
+        model_path = self.find_model_path(
+            self.current_generation_model_name, self.model_dir
+        )
         if not model_path:
             logging.error(f"生成模型文件不存在: {self.current_generation_model_name}")
             return
         try:
             self.generation_model = Llama(
-                model_path=model_path,
-                n_gpu_layers=-1,
-                n_ctx=4096,
-                verbose=True
+                model_path=model_path, n_gpu_layers=-1, n_ctx=4096, verbose=True
             )
             logging.info(f"成功加载生成模型: {model_path}")
 
@@ -81,13 +83,14 @@ class RAGService:
             except Exception as e:
                 logging.error(f"加载 sentence-transformers 嵌入模型失败: {e}")
 
-        model_path = self.find_model_path(self.current_embedding_model_name, self.model_dir)
-        if model_path and (model_path.endswith(".gguf") or model_path.endswith(".safetensors")):
+        model_path = self.find_model_path(
+            self.current_embedding_model_name, self.model_dir
+        )
+        if model_path and (
+            model_path.endswith(".gguf") or model_path.endswith(".safetensors")
+        ):
             try:
-                self.embedding_model = Llama(
-                    model_path=model_path,
-                    embedding=True
-                )
+                self.embedding_model = Llama(model_path=model_path, embedding=True)
                 logging.info(f"成功加载 gguf 嵌入模型: {model_path}")
                 return
             except Exception as e:
@@ -100,7 +103,7 @@ class RAGService:
         embedding_models = []
         if os.path.exists(self.model_dir):
             for filename in os.listdir(self.model_dir):
-                if filename.endswith('.gguf') or filename.endswith('.safetensors'):
+                if filename.endswith(".gguf") or filename.endswith(".safetensors"):
                     lower = filename.lower()
                     if "embed" in lower or "embedding" in lower:
                         embedding_models.append(filename)
@@ -109,7 +112,9 @@ class RAGService:
         if os.path.exists(self.embed_model_dir):
             for d in os.listdir(self.embed_model_dir):
                 sub = os.path.join(self.embed_model_dir, d)
-                if os.path.isdir(sub) and os.path.exists(os.path.join(sub, "config.json")):
+                if os.path.isdir(sub) and os.path.exists(
+                    os.path.join(sub, "config.json")
+                ):
                     embedding_models.append(d)
         return generation_models, embedding_models
 
@@ -132,7 +137,9 @@ class RAGService:
             return
 
         # 优先chat_handler，若没有chat模板，自动降级到基础 completion
-        limit = MAX_TOKENS if max_new_tokens is None else min(MAX_TOKENS, max_new_tokens)
+        limit = (
+            MAX_TOKENS if max_new_tokens is None else min(MAX_TOKENS, max_new_tokens)
+        )
         if not self.chat_handler:
             try:
                 stream = self.generation_model(
@@ -156,8 +163,8 @@ class RAGService:
         try:
             messages = [{"role": "user", "content": prompt}]
             handler_result = self.chat_handler(messages=messages)
-            final_prompt = handler_result['prompt']
-            stop_sequences = handler_result['stop']
+            final_prompt = handler_result["prompt"]
+            stop_sequences = handler_result["stop"]
             stream = self.generation_model(
                 prompt=final_prompt,
                 stop=stop_sequences,

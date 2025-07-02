@@ -5,9 +5,11 @@ from pathlib import Path
 MODEL_DIR = "/models"
 ACTIVE_MODELS_FILE = Path("/models/active_models.json")
 
+
 def _ensure_file():
     if not ACTIVE_MODELS_FILE.exists():
         ACTIVE_MODELS_FILE.write_text(json.dumps({"generation": "", "embedding": ""}))
+
 
 def _load_active() -> dict:
     _ensure_file()
@@ -16,8 +18,10 @@ def _load_active() -> dict:
     except Exception:
         return {"generation": "", "embedding": ""}
 
+
 def _save_active(data: dict) -> None:
     ACTIVE_MODELS_FILE.write_text(json.dumps(data))
+
 
 def list_models() -> dict:
     generation_models = []
@@ -46,6 +50,7 @@ def list_models() -> dict:
         "current_embedding_model": active.get("embedding", ""),
     }
 
+
 def switch_generation_model(model_name: str) -> bool:
     models = list_models()
     if model_name not in models["generation_models"]:
@@ -54,6 +59,7 @@ def switch_generation_model(model_name: str) -> bool:
     active["generation"] = model_name
     _save_active(active)
     return True
+
 
 def switch_embedding_model(model_name: str) -> bool:
     models = list_models()

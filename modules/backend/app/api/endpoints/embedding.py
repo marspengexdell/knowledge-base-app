@@ -3,6 +3,7 @@ from services.knowledge_base import kb_service
 
 router = APIRouter()
 
+
 @router.get("/embed_doc")
 async def embed_document_api(file_name: str = Query(...)):
     """输入知识库中的文件名，返回embedding向量"""
