@@ -25,8 +25,8 @@ services:
   # 后端服务: 处理业务逻辑和API
   backend:
     build:
-      context: ./modules/backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: modules/backend/Dockerfile
     container_name: knowledge-base-app-backend
     env_file: ./modules/backend/.env
     volumes:
@@ -51,7 +51,8 @@ services:
   # 推理服务: 运行AI模型
   inference:
     build:
-      context: ./modules/inference
+      context: .
+    dockerfile: modules/inference/Dockerfile
     container_name: knowledge-base-app-inference
     restart: unless-stopped
     volumes:
