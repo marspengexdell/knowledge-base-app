@@ -7,17 +7,22 @@ from services.knowledge_base import kb_service
 
 logger = logging.getLogger(__name__)
 
+
 class ChatService:
     async def handle_chat(self, websocket: WebSocket, session_id: str, query: str):
         """
         处理聊天请求的核心逻辑，包含“知识库优先，AI后备”的智能判断。
         """
         await websocket.accept()
-        await websocket.send_json({"session_id": session_id, "event": "[ID]", "token": session_id})
+        await websocket.send_json(
+            {"session_id": session_id, "event": "[ID]", "token": session_id}
+        )
 
         # 步骤 1: 首先在知识库中搜索相关文档
         logger.info(f"正在为问题: '{query}' 搜索知识库...")
-        context_docs = kb_service.search(query=query, top_k=3) # 搜索最相关的3个文档片段
+        context_docs = kb_service.search(
+            query=query, top_k=3
+        )  # 搜索最相关的3个文档片段
 
         # 步骤 2: 进行智能判断
         if context_docs:
@@ -25,7 +30,9 @@ class ChatService:
             logger.info("在知识库中找到相关内容，将使用知识库进行回答。")
 
             # 构建上下文文本
-            context_text = "\n\n---\n\n".join([doc.page_content for doc in context_docs])
+            context_text = "\n\n---\n\n".join(
+                [doc.page_content for doc in context_docs]
+            )
 
             # 构建“专业模式”的指令 (Prompt)
             prompt = f"""

@@ -22,6 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("尝试连接到 gRPC 服务")
@@ -35,16 +36,21 @@ async def startup_event():
             await asyncio.sleep(5)
     logger.error("未能连接 gRPC 服务，AI相关功能将不可用")
 
+
 @app.on_event("shutdown")
 async def shutdown_event():
     await grpc_client_manager.disconnect()
+
 
 app.include_router(chat_router, prefix="/api/chat", tags=["Chat"])
 app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 app.include_router(embedding_router, prefix="/api/embedding", tags=["Embedding"])
 app.include_router(knowledge_router, prefix="/api/admin/knowledge")
 app.include_router(models_router, prefix="/api/admin/models", tags=["Models"])
-app.include_router(knowledge_base_router, prefix="/api/admin/kb", tags=["KnowledgeBase"])
+app.include_router(
+    knowledge_base_router, prefix="/api/admin/kb", tags=["KnowledgeBase"]
+)
+
 
 @app.get("/")
 def read_root():

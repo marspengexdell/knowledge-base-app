@@ -4,6 +4,7 @@ from services.model_management import model_manager
 
 router = APIRouter()
 
+
 @router.get("/list", response_model=List)
 async def list_models():
     """
@@ -15,6 +16,7 @@ async def list_models():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/load/{model_name}")
 async def load_model(model_name: str):
     """
@@ -23,7 +25,10 @@ async def load_model(model_name: str):
     try:
         success = await model_manager.load_model(model_name)
         if not success:
-            raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found or failed to load.")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Model '{model_name}' not found or failed to load.",
+            )
         return {"message": f"Model '{model_name}' is being loaded."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -8,6 +8,7 @@ from services.knowledge_base import kb_service
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
 @router.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
     """
@@ -31,10 +32,12 @@ async def upload_document(file: UploadFile = File(...)):
         logger.error(f"处理文件 '{file.filename}' 时发生错误: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"处理文件失败: {e}")
 
+
 @router.get("/list")
 async def list_documents():
     docs = kb_service.list_documents()
     return {"docs": docs}
+
 
 @router.get("/download")
 async def download_document(file: str):
@@ -42,6 +45,7 @@ async def download_document(file: str):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="文件不存在")
     return FileResponse(file_path, filename=file)
+
 
 @router.delete("/delete")
 async def delete_document(file: str):
