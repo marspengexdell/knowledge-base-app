@@ -8,6 +8,7 @@ from protos import inference_pb2
 
 router = APIRouter()
 
+
 @router.post("/models/upload")
 async def upload_model(file: UploadFile = File(...)):
     model_dir = settings.MODEL_DIR
@@ -18,6 +19,7 @@ async def upload_model(file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         f.write(content)
     return {"success": True, "message": f"模型 {file.filename} 上传成功"}
+
 
 @router.post("/models/switch")
 async def switch_model(request: ModelSwitchRequest):
@@ -30,7 +32,9 @@ async def switch_model(request: ModelSwitchRequest):
     if not grpc_client_manager.stub:
         await grpc_client_manager.connect()
     try:
-        success, message = await grpc_client_manager.switch_model(model_name, model_type_enum)
+        success, message = await grpc_client_manager.switch_model(
+            model_name, model_type_enum
+        )
         # 支持嵌入模型和生成模型的本地状态持久化
         if success:
             if model_type_str == "GENERATION":
@@ -41,6 +45,7 @@ async def switch_model(request: ModelSwitchRequest):
     except Exception as e:
         return {"success": False, "message": f"切换模型失败: {e}"}
 
+
 @router.get("/models")
 async def get_models():
     try:
@@ -50,6 +55,7 @@ async def get_models():
     except Exception as e:
         try:
             from services.model_store import list_models as list_available_models
+
             models = list_available_models()
             models["device"] = ""
             return models
@@ -63,6 +69,7 @@ async def get_models():
                 "error": str(e),
             }
 
+
 @router.get("/models/status")
 async def get_model_status():
     try:
@@ -72,6 +79,7 @@ async def get_model_status():
     except Exception as e:
         try:
             from services.model_store import list_models as list_available_models
+
             models = list_available_models()
             models["device"] = ""
             return models

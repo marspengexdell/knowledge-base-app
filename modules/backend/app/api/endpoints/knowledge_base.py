@@ -5,6 +5,7 @@ from services.knowledge_base import kb_service
 
 router = APIRouter()
 
+
 @router.get("/documents", response_model=List[Dict[str, Any]])
 async def list_documents():
     """获取所有已上传的文档列表。"""
@@ -12,6 +13,7 @@ async def list_documents():
     if documents is None:
         raise HTTPException(status_code=500, detail="无法从知识库获取文档列表")
     return documents
+
 
 @router.delete("/documents/{source_name}")
 async def delete_document(source_name: str):
