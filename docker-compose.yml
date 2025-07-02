@@ -53,9 +53,6 @@ services:
     build:
       context: .
       dockerfile: modules/inference/Dockerfile
-
-    dockerfile: modules/inference/Dockerfile
-
     container_name: knowledge-base-app-inference
     restart: unless-stopped
     volumes:
