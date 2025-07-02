@@ -43,6 +43,8 @@ newer versions, which can lead to "Descriptors cannot be created directly"
 runtime errors. The backend Dockerfile now sets the environment variable
 `PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python` to fall back to the
 pure-Python protobuf parser and avoid this incompatibility.
+This variable is also listed in `modules/backend/.env` so Docker Compose
+exports it automatically when the backend container starts.
 
 The services will be available on the following ports:
 
