@@ -1,4 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Body
+
 # 核心修正：移除所有 'app.' 前缀，使导入相对于 /app 目录
 from core.grpc_client import grpc_client_manager
 from services.knowledge_base import kb_service
@@ -15,7 +16,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def build_final_messages_for_grpc(query: str, context_docs: list[str], history: list[dict]) -> list[dict]:
+def build_final_messages_for_grpc(
+    query: str, context_docs: list[str], history: list[dict]
+) -> list[dict]:
     final_messages = []
     if context_docs:
         context_str = "\n\n".join(context_docs)
@@ -37,7 +40,9 @@ def build_final_messages_for_grpc(query: str, context_docs: list[str], history: 
 
 
 @router.post("/")
-async def chat_api(query: str = Body(..., embed=True), session_id: str | None = Body(default=None)):
+async def chat_api(
+    query: str = Body(..., embed=True), session_id: str | None = Body(default=None)
+):
     if not session_id:
         session_id = create_session()
 
@@ -46,10 +51,15 @@ async def chat_api(query: str = Body(..., embed=True), session_id: str | None = 
     try:
         context_docs = await kb_service.search(query, n_results=3)
         context_contents = [doc.page_content for doc in context_docs]
-        messages_for_grpc = build_final_messages_for_grpc(query, context_contents, history)
+        messages_for_grpc = build_final_messages_for_grpc(
+            query, context_contents, history
+        )
 
         grpc_req = inference_pb2.ChatRequest(
-            messages=[inference_pb2.Message(role=m["role"], content=m["content"]) for m in messages_for_grpc],
+            messages=[
+                inference_pb2.Message(role=m["role"], content=m["content"])
+                for m in messages_for_grpc
+            ],
             session_id=session_id,
         )
 
@@ -80,7 +90,9 @@ async def websocket_chat(websocket: WebSocket):
 
             if not session_id:
                 session_id = data.get("session_id") or create_session()
-                await websocket.send_text(json.dumps({"event": "[ID]", "session_id": session_id}))
+                await websocket.send_text(
+                    json.dumps({"event": "[ID]", "session_id": session_id})
+                )
 
             if not user_query:
                 continue
@@ -88,27 +100,44 @@ async def websocket_chat(websocket: WebSocket):
             history = get_session_context(session_id)
             context_docs = await kb_service.search(user_query, n_results=3)
             context_contents = [doc.page_content for doc in context_docs]
-            messages_for_grpc = build_final_messages_for_grpc(user_query, context_contents, history)
+            messages_for_grpc = build_final_messages_for_grpc(
+                user_query, context_contents, history
+            )
 
             grpc_req = inference_pb2.ChatRequest(
-                messages=[inference_pb2.Message(role=m["role"], content=m["content"]) for m in messages_for_grpc],
+                messages=[
+                    inference_pb2.Message(role=m["role"], content=m["content"])
+                    for m in messages_for_grpc
+                ],
                 session_id=session_id,
             )
 
             assistant_response = ""
             async for token in grpc_client_manager.chat(grpc_req):
-                await websocket.send_text(json.dumps({"token": token, "session_id": session_id}))
+                await websocket.send_text(
+                    json.dumps({"token": token, "session_id": session_id})
+                )
                 assistant_response += token
 
             append_message(session_id, {"role": "user", "content": user_query})
-            append_message(session_id, {"role": "assistant", "content": assistant_response})
+            append_message(
+                session_id, {"role": "assistant", "content": assistant_response}
+            )
 
-            await websocket.send_text(json.dumps({"event": "[DONE]", "session_id": session_id}))
+            await websocket.send_text(
+                json.dumps({"event": "[DONE]", "session_id": session_id})
+            )
 
     except WebSocketDisconnect:
         logger.info(f"\u5ba2\u6237\u7aef\u65ad\u5f00\u8fde\u63a5: {websocket.client}")
     except Exception as e:
-        logger.error(f"WebSocket\u5904\u7406\u7a0b\u5e8f\u53d1\u751f\u610f\u5916\u9519\u8bef: {e}", exc_info=True)
-        if session_id and not websocket.client_state == 'DISCONNECTED':
-            await websocket.send_text(json.dumps({"event": "[ERROR]", "detail": str(e), "session_id": session_id}))
-
+        logger.error(
+            f"WebSocket\u5904\u7406\u7a0b\u5e8f\u53d1\u751f\u610f\u5916\u9519\u8bef: {e}",
+            exc_info=True,
+        )
+        if session_id and not websocket.client_state == "DISCONNECTED":
+            await websocket.send_text(
+                json.dumps(
+                    {"event": "[ERROR]", "detail": str(e), "session_id": session_id}
+                )
+            )
