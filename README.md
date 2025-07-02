@@ -38,7 +38,11 @@ docker compose build --no-cache backend
 
 The application depends on `protobuf` 3.20.3. If your images were built
 with a different version, rebuild all services without the Docker cache
-to avoid import errors.
+to avoid import errors. Some packages ship protobuf stubs generated for
+newer versions, which can lead to "Descriptors cannot be created directly"
+runtime errors. The backend Dockerfile now sets the environment variable
+`PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python` to fall back to the
+pure-Python protobuf parser and avoid this incompatibility.
 
 The services will be available on the following ports:
 
