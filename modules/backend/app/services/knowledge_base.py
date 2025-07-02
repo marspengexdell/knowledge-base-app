@@ -13,7 +13,9 @@ class KnowledgeBaseService:
     """Service for managing knowledge base documents."""
 
     def __init__(self, storage_dir: str | None = None) -> None:
-        self.storage_dir = storage_dir or os.getenv("KNOWLEDGE_BASE_DOCS", "/knowledge_base_docs")
+        self.storage_dir = storage_dir or os.getenv(
+            "KNOWLEDGE_BASE_DOCS", "/knowledge_base_docs"
+        )
         os.makedirs(self.storage_dir, exist_ok=True)
         logger.info(f"Knowledge base storage directory: {self.storage_dir}")
 
@@ -85,7 +87,9 @@ class KnowledgeBaseService:
         """Asynchronously delete all vectors related to the given source."""
         return self.delete_document(source_name)
 
-    async def add_documents(self, documents: List[Document], document_source: str) -> None:
+    async def add_documents(
+        self, documents: List[Document], document_source: str
+    ) -> None:
         """Add a batch of documents with embeddings to the vector database."""
         if not documents:
             return
@@ -104,7 +108,9 @@ class KnowledgeBaseService:
             query_embedding = await embedding_model.embed(query)
             if not query_embedding:
                 return []
-            results = await vector_db.search_with_vector(query_embedding, top_k=n_results)
+            results = await vector_db.search_with_vector(
+                query_embedding, top_k=n_results
+            )
             logger.info(f"Found {len(results)} documents for query '{query}'")
             return results
         except Exception as e:

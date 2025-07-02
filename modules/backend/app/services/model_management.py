@@ -7,6 +7,7 @@ from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
+
 class ModelManager:
     """
     Manages discovering, loading, and interacting with AI models.
@@ -33,12 +34,14 @@ class ModelManager:
             for filename in os.listdir(self.models_dir):
                 if filename.endswith(".gguf"):
                     model_path = os.path.join(self.models_dir, filename)
-                    models_list.append({
-                        "model_name": filename,
-                        "model_path": model_path
-                    })
+                    models_list.append(
+                        {"model_name": filename, "model_path": model_path}
+                    )
         except Exception as e:
-            logger.error(f"Error while scanning models directory '{self.models_dir}': {e}", exc_info=True)
+            logger.error(
+                f"Error while scanning models directory '{self.models_dir}': {e}",
+                exc_info=True,
+            )
             return []
 
         logger.info(f"Discovered {len(models_list)} supported models in this scan.")
@@ -52,8 +55,8 @@ class ModelManager:
     def get_model_path(self, model_name: str) -> Optional[str]:
         """Finds the full path of a model by its name by performing a fresh scan."""
         for model_info in self._discover_supported_models():
-            if model_info['model_name'] == model_name:
-                return model_info['model_path']
+            if model_info["model_name"] == model_name:
+                return model_info["model_path"]
         logger.warning(f"Model '{model_name}' not found in '{self.models_dir}'.")
         return None
 
@@ -81,7 +84,7 @@ class ModelManager:
         try:
             # For now, we use a hardcoded, well-known embedding model.
             # This could be made configurable in the future.
-            model_name = 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
+            model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
             logger.info(f"Loading embedding model: {model_name}...")
             self.embedding_model = SentenceTransformer(model_name)
             logger.info("Embedding model loaded successfully.")
@@ -90,6 +93,7 @@ class ModelManager:
             logger.error(f"Failed to load embedding model: {e}", exc_info=True)
             self.embedding_model = None
             return None
+
 
 # Create a single, shared instance of the service for the app to use
 model_manager = ModelManager()

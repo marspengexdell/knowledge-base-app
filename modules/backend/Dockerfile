@@ -11,6 +11,10 @@ COPY ./app /app
 COPY ./requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
+# Work around protobuf runtime incompatibility with some packages by forcing
+# the slower pure-Python implementation
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+
 # 暴露端口
 EXPOSE 8000
 
