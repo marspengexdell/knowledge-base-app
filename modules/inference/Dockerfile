@@ -25,7 +25,7 @@ RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/libcuda.s
     && python3 -m pip install --upgrade pip \
     && export CMAKE_ARGS="-DGGML_CUDA=on" \
     && export FORCE_CMAKE=1 \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # ★ 新增的调试步骤 ★
 # 打印所有已安装的 Python 包及其版本到构建日志中
