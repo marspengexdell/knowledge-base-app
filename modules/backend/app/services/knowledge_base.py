@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import List
+from typing import List, Optional
 from langchain_core.documents import Document
 
 from core.db_client import vector_db
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class KnowledgeBaseService:
     """Service for managing knowledge base documents."""
 
-    def __init__(self, storage_dir: str | None = None) -> None:
+    def __init__(self, storage_dir: Optional[str] = None) -> None:
         self.storage_dir = storage_dir or os.getenv(
             "KNOWLEDGE_BASE_DOCS", "/knowledge_base_docs"
         )
@@ -54,7 +54,7 @@ class KnowledgeBaseService:
             if os.path.isfile(os.path.join(self.storage_dir, f))
         ]
 
-    async def list_all_documents(self) -> List[dict] | None:
+    async def list_all_documents(self) -> Optional[List[dict]]:
         """List all documents stored in the vector database."""
         try:
             results = vector_db.collection.get(include=["metadatas"], limit=None)
@@ -117,5 +117,33 @@ class KnowledgeBaseService:
             logger.error(f"Knowledge base search failed: {e}", exc_info=True)
             return []
 
+    async def rag_or_llm_response(self, query: str, n_results: int = 3) -> dict:
+        """
+        知识库优先，没命中时自动走大模型 LLM 回复。
+        返回格式: {'rag': True/False, 'docs': [...], 'response': str}
+        你可按需定制调用主 LLM 推理接口
+        """
+        docs = await self.search(query, n_results=n_results)
+        if docs:
+            # 有知识库命中，走 RAG
+            # 示例：用 docs 拼 rag prompt，再喂给 LLM，返回结果
+            context = "\n".join([d.page_content[:2000] for d in docs if d.page_content])
+            # 这里你要用实际的 LLM 调用。伪代码如下：
+            # response = await llm_generate_with_knowledge(query, context)
+            response = f"【知识库命中】（实际内容应由 LLM 补全，此处为示意）\n{context[:150]}"
+            return {
+                "rag": True,
+                "docs": docs,
+                "response": response
+            }
+        else:
+            # 未命中知识库，直接让 LLM 普通回复
+            # response = await llm_generate(query)
+            response = f"【未命中知识库，LLM自由回复】（实际内容应由 LLM 补全，此处为示意）\n抱歉，没有找到相关知识。"
+            return {
+                "rag": False,
+                "docs": [],
+                "response": response
+            }
 
 kb_service = KnowledgeBaseService()

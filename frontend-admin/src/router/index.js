@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
 import KnowledgeBase from '../views/KnowledgeBase.vue';
-import ModelManagement from '../views/ModelManagement.vue';
+import ModelManagement from '../views/ModelManagement.vue';  // 大小写一致
 import FeedbackReview from '../views/FeedbackReview.vue';
 import DocumentManagement from '../views/DocumentManagement.vue';
 import Dashboard from '../views/Dashboard.vue';

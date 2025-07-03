@@ -12,18 +12,15 @@ logger = logging.getLogger(__name__)
 
 class VectorDBClient:
     """
-    一个专门用于与Chroma向量数据库交互的客户端。
-    它封装了连接、添加、搜索和删除文档的所有底层逻辑。
+    专门用于与Chroma向量数据库交互的客户端。
     """
 
     def __init__(self):
-        # 从环境变量获取ChromaDB的URL，如果获取不到则使用默认值
+        # 从环境变量获取ChromaDB的URL
         db_url_str = os.getenv("VECTOR_DB_URL", "http://vector-db:8000")
         logger.info(f"正在连接到向量数据库: {db_url_str}")
 
         try:
-            # --- 代码修复开始 ---
-            # 解析 URL 以分离出 host 和 port
             parsed_url = urlparse(db_url_str)
             db_host = parsed_url.hostname
             db_port = parsed_url.port
@@ -31,8 +28,6 @@ class VectorDBClient:
             if not db_host or not db_port:
                 raise ValueError("无效的 VECTOR_DB_URL，无法解析 host 或 port")
 
-            # 初始化ChromaDB HTTP客户端
-            # 使用新的 host 和 port 参数
             self.client = chromadb.HttpClient(
                 host=db_host,
                 port=db_port,
@@ -40,12 +35,7 @@ class VectorDBClient:
                     is_persistent=True,
                 ),
             )
-            # --- 代码修复结束 ---
-
-            # 定义一个统一的集合名称，所有文档都将存储在这里
             self.collection_name = "knowledge_base_main_collection"
-
-            # 获取或创建这个集合
             self.collection = self.client.get_or_create_collection(
                 name=self.collection_name
             )
@@ -54,7 +44,6 @@ class VectorDBClient:
             )
         except Exception as e:
             logger.error(f"连接向量数据库失败: {e}", exc_info=True)
-            # 如果连接失败，抛出异常以阻止服务启动
             raise
 
     async def add_documents(
@@ -63,18 +52,12 @@ class VectorDBClient:
         embeddings: List[List[float]],
         document_source: str,
     ):
-        """
-        将一批文档片段及其对应的向量化结果添加到数据库。
-        """
         try:
-            # 为每个文档片段创建唯一的ID和元数据
             ids = [f"{document_source}_{i}" for i in range(len(documents))]
             metadatas = [
                 {"source": document_source, "text": doc.page_content}
                 for doc in documents
             ]
-
-            # 使用 collection.add() 方法一次性添加所有数据
             self.collection.add(embeddings=embeddings, metadatas=metadatas, ids=ids)
             logger.info(
                 f"成功向集合 '{self.collection_name}' 中添加了 {len(documents)} 个文档片段，来源: {document_source}。"
@@ -87,24 +70,32 @@ class VectorDBClient:
     ) -> List[Document]:
         """
         使用一个给定的查询向量，在数据库中执行相似度搜索。
+        自动兼容 metadata["text"]/documents 任意一种返回结构。
         """
         try:
             results = self.collection.query(
-                query_embeddings=[query_embedding],  # 使用预先计算好的向量进行搜索
+                query_embeddings=[query_embedding],
                 n_results=top_k,
+                include=["metadatas", "documents", "distances"],  # 强制返回所有
             )
 
-            # 将搜索结果格式化为LangChain的Document对象列表
             found_docs = []
-            if results and results.get("documents") and results["documents"][0]:
-                for i, text in enumerate(results["documents"][0]):
-                    metadata = (
-                        results["metadatas"][0][i] if results.get("metadatas") else {}
-                    )
-                    distance = (
-                        results["distances"][0][i] if results.get("distances") else None
-                    )
+            metas_list = results.get("metadatas", [[]])
+            docs_list = results.get("documents", [[]])
+            distances_list = results.get("distances", [[]])
+
+            # 只遍历元数据（因为内容常在 metadata['text']）
+            if metas_list and metas_list[0]:
+                for i, metadata in enumerate(metas_list[0]):
+                    text = metadata.get("text", None)
+                    if not text and docs_list and docs_list[0] and len(docs_list[0]) > i:
+                        text = docs_list[0][i]
+                    distance = distances_list[0][i] if distances_list and len(distances_list[0]) > i else None
+                    metadata = dict(metadata) if metadata else {}
                     metadata["distance"] = distance
+                    if text is None or text == "":
+                        logger.warning(f"第 {i} 个搜索结果内容为 None 或空，跳过。")
+                        continue
                     found_docs.append(Document(page_content=text, metadata=metadata))
 
             logger.info(f"通过向量搜索找到了 {len(found_docs)} 个相关文档。")
@@ -114,10 +105,10 @@ class VectorDBClient:
             return []
 
     async def asimilarity_search(self, query: str, k: int = 3) -> List[Document]:
-        """Compute the embedding for a query and search the vector DB."""
         try:
             query_embedding = await embedding_model.embed(query)
             if not query_embedding:
+                logger.warning("未能获得查询的 embedding，直接返回空结果。")
                 return []
             return await self.search_with_vector(query_embedding, k)
         except Exception as e:
@@ -125,9 +116,6 @@ class VectorDBClient:
             return []
 
     def delete_documents_by_source(self, source: str):
-        """
-        根据文档源（文件名）删除所有相关的文档片段。
-        """
         try:
             self.collection.delete(where={"source": source})
             logger.info(
@@ -136,6 +124,4 @@ class VectorDBClient:
         except Exception as e:
             logger.error(f"从向量数据库中删除文档时出错: {e}", exc_info=True)
 
-
-# 创建一个全局的向量数据库客户端单例，供项目其他模块导入和使用
 vector_db = VectorDBClient()
