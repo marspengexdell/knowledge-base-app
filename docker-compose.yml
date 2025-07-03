@@ -1,18 +1,13 @@
-# Docker Compose配置 - 最终优化版
-# 移除了已过时的 'version' 标签，并对服务配置进行了加固和统一
-
 services:
 
-  # Nginx: 统一的流量入口和反向代理
   nginx:
     image: nginx:1.25.4-alpine
     container_name: knowledge-base-app-nginx
     restart: unless-stopped
     ports:
       - "80:80"
-      # - "443:443" # 为HTTPS预留
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro # 配置文件以只读方式挂载，更安全
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./data/certbot/conf:/etc/letsencrypt:ro
       - ./data/certbot/www:/var/www/certbot:ro
     networks:
@@ -22,7 +17,6 @@ services:
       - frontend-user
       - frontend-admin
 
-  # 后端服务: 处理业务逻辑和API
   backend:
     build:
       context: .
@@ -31,24 +25,20 @@ services:
     env_file: ./modules/backend/.env
     volumes:
       - ./modules/backend/app:/app
-
       - ./models:/models
-
       - ./knowledge_base_docs:/knowledge_base_docs
-
     ports:
       - "8000:8000"
     networks:
       - app-network
     restart: always
     environment:
-      - INFERENCE_SERVER_URL=http://inference:8080
+      - GRPC_SERVER=inference:50051     # ⭐️注意这里，所有后端gRPC请求会连到这个
       - VECTOR_DB_URL=http://chromadb:8000
     depends_on:
       - chromadb
       - inference
 
-  # 推理服务: 运行AI模型
   inference:
     build:
       context: .
@@ -56,8 +46,7 @@ services:
     container_name: knowledge-base-app-inference
     restart: unless-stopped
     volumes:
-      # 核心修正: 推理服务从与后端相同的模型存储目录中读取模型
-      - ./models:/models:ro # 容器内的路径是 /models，与推理服务的代码逻辑匹配
+      - ./models:/models:ro
     deploy:
       resources:
         reservations:
@@ -68,15 +57,12 @@ services:
     shm_size: '2gb'
     networks:
       - app-network
-    healthcheck: # 优化: 添加健康检查
-      # 这里假设推理服务在某个端口提供了一个健康检查端点，例如 50051
-      # 如果没有，可以检查一个总是存在的文件
+    healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 30s
       timeout: 10s
       retries: 5
 
-  # 用户前端
   frontend-user:
     build:
       context: ./frontend-user
@@ -85,7 +71,6 @@ services:
     networks:
       - app-network
 
-  # 管理员前端
   frontend-admin:
     build:
       context: ./frontend-admin
@@ -94,7 +79,6 @@ services:
     networks:
       - app-network
 
-  # 向量数据库
   chromadb:
     image: chromadb/chroma:0.4.24
     container_name: knowledge-base-app-chromadb
@@ -106,9 +90,6 @@ services:
       - app-network
     restart: on-failure:0
 
-# 定义一个全局网络，让所有服务都在同一个局域网内
 networks:
   app-network:
     driver: bridge
-
-

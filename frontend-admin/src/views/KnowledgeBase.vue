@@ -7,7 +7,6 @@
         </div>
       </template>
       <el-tabs v-model="activeTab">
-        <!-- File Upload Tab -->
         <el-tab-pane label="文件上传" name="file">
           <el-upload
             ref="uploadRef"
@@ -47,7 +46,8 @@ import { UploadFilled } from '@element-plus/icons-vue';
 
 const activeTab = ref('file');
 const uploadRef = ref();
-const uploadUrl = '/api/admin/knowledge/upload'; // ✅ 必须改成这个
+// ✅ 改为 /api/admin/kb/upload
+const uploadUrl = '/api/admin/kb/upload';
 
 const submitUpload = () => {
   uploadRef.value?.submit();

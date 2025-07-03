@@ -1,34 +1,38 @@
-# 使用官方的Python基础镜像
 FROM python:3.10-slim
 
-# 设置工作目录
 WORKDIR /app
 
-# 1. 首先只复制依赖文件
-# 这样做可以利用Docker的缓存机制。只要 requirements.txt 不变，就不会重新安装依赖。
 COPY ./modules/backend/requirements.txt .
 
-# 2. 安装项目依赖 (包括 grpcio-tools)
-# 请确保 'grpcio-tools' 已经添加到了你的 requirements.txt 文件中！
 RUN pip install --no-cache-dir --upgrade -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 3. 复制 .proto 文件
-# 因为构建上下文是项目根目录，所以可以轻松访问 protos 目录
-COPY ./protos ./protos
+# 1. 复制 proto 到统一的 /protos 目录
+COPY ./modules/backend/app/protos/opentelemetry /protos/opentelemetry
+COPY ./modules/inference/app/protos/inference.proto /protos/inference.proto
 
-# 4. 编译 .proto 文件为 Python 代码
-# 这会在 /app 目录下生成一个 protos 包，其中包含 inference_pb2.py 和 inference_pb2_grpc.py
-RUN python -m grpc_tools.protoc -I./protos --python_out=. --grpc_python_out=. ./protos/*.proto
+# 2. 编译 proto 文件到 /app/protos
+RUN mkdir -p /app/protos && \
+    python3 -m grpc_tools.protoc -I/protos --python_out=/app/protos --grpc_python_out=/app/protos \
+        /protos/inference.proto \
+        /protos/opentelemetry/proto/collector/logs/v1/logs_service.proto \
+        /protos/opentelemetry/proto/collector/metrics/v1/metrics_service.proto \
+        /protos/opentelemetry/proto/collector/profiles/v1development/profiles_service.proto \
+        /protos/opentelemetry/proto/collector/trace/v1/trace_service.proto \
+        /protos/opentelemetry/proto/common/v1/common.proto \
+        /protos/opentelemetry/proto/logs/v1/logs.proto \
+        /protos/opentelemetry/proto/metrics/v1/metrics.proto \
+        /protos/opentelemetry/proto/profiles/v1development/profiles.proto \
+        /protos/opentelemetry/proto/resource/v1/resource.proto \
+        /protos/opentelemetry/proto/trace/v1/trace.proto
 
-# 5. 复制后端应用的所有代码
-COPY ./modules/backend/app ./app
+# 3. 确保包结构
+RUN touch /app/protos/__init__.py
 
-# 设置环境变量，解决 protobuf 的一个潜在问题
+# 4. 复制实际业务代码（main.py等）
+COPY ./modules/backend/app /app
+
 ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
-# 暴露端口
 EXPOSE 8000
 
-# 启动应用的命令
-# 注意：生产环境中建议去掉 --reload 标志
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

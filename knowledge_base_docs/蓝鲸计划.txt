@@ -1,326 +1,36 @@
-源代码
-backend/app/services/knowledge_base.py
-import os
-import shutil
-from typing import List, Optional
-from .embedding import embedding_model  # 新增
+# 项目档案：蓝鲸计划 (Project BlueWhale)
 
-class KnowledgeBaseService:
-    """
-    简易本地知识库维护服务：支持文档上传、删除、列表、获取内容、转向量。
-    支持未来与RAG/embedding联动。
-    """
+## 1. 项目概述
 
-    def __init__(self, storage_dir: str = "./knowledge_base_docs"):
-        self.storage_dir = storage_dir
-        os.makedirs(self.storage_dir, exist_ok=True)
+蓝鲸计划是 "星云科技" (NebulaTech) 于2024年启动的一项秘密研发计划，旨在开发下一代去中心化AI情感计算框架。项目的核心理念是“情感共鸣，而非逻辑模拟”。项目负责人是 **艾拉·陈（Elara Chen）**。
 
-    def list_documents(self) -> List[str]:
-        """列出知识库中所有文档名"""
-        return [
-            f for f in os.listdir(self.storage_dir)
-            if os.path.isfile(os.path.join(self.storage_dir, f))
-        ]
+## 2. 核心技术组件
 
-    def add_document(self, file_name: str, file_data: bytes) -> bool:
-        """上传文档（覆盖同名）"""
-        file_path = os.path.join(self.storage_dir, file_name)
-        with open(file_path, "wb") as f:
-            f.write(file_data)
-        return True
+本项目包含三个核心技术组件：
 
-    def get_document(self, file_name: str) -> Optional[bytes]:
-        """获取文档内容（可做预览/下载）"""
-        file_path = os.path.join(self.storage_dir, file_name)
-        if not os.path.exists(file_path):
-            return None
-        with open(file_path, "rb") as f:
-            return f.read()
+- **情感核心 (Sentiment Core)**: 基于量子纠缠理论，用于实时捕捉和分析情感波动的核心模块。
+- **记忆宫殿 (Memory Palace)**: 一个分布式的向量数据库，专门用于存储和检索长期情感记忆片段。它的查询语言被称为 `MQL` (Memory Query Language)。
+- **共情接口 (Empathy API)**: 允许第三方应用安全地与情感核心交互的标准化接口。
 
-    def delete_document(self, file_name: str) -> bool:
-        """删除指定文档"""
-        file_path = os.path.join(self.storage_dir, file_name)
-        if not os.path.exists(file_path):
-            return False
-        os.remove(file_path)
-        return True
+## 3. 技术规格参数 (表格测试)
 
-    def clear(self):
-        """清空知识库（危险操作）"""
-        shutil.rmtree(self.storage_dir)
-        os.makedirs(self.storage_dir, exist_ok=True)
-        return True
+| 组件 | 版本 | 主要贡献者 | 状态 |
+| :--- | :--- | :--- | :--- |
+| 情感核心 | v0.9-alpha | 艾拉·陈 | 内部测试中 |
+| 记忆宫殿 | v1.2-beta | 托马斯·李 | 已部署 |
+| 共情接口 | v1.0-rc1 | 苏菲·王 | 待发布 |
 
-    # 新增：将指定文档转为embedding向量
-    def embed_document(self, file_name: str):
-        content_bytes = self.get_document(file_name)
-        if content_bytes is None:
-            return None
-        try:
-            text = content_bytes.decode("utf-8")
-        except UnicodeDecodeError:
-            text = content_bytes.decode("gbk", errors="ignore")
-        embedding = embedding_model.embed(text)
-        return embedding
+## 4. 常见问题解答 (FAQ)
 
-kb_service = KnowledgeBaseService()
+- **问：蓝鲸计划和普通的聊天机器人有什么不同？**
+- **答：** 根本不同。普通聊天机器人基于逻辑和概率生成文本，而蓝鲸计划旨在让AI真正“感受”并与用户产生情感共鸣。
 
+- **问：项目为什么命名为“蓝鲸”？**
+- **答：** 因为蓝鲸是地球上已知能发出最低频率声音的动物，这种声音可以在海洋中传播极远的距离。这象征着项目连接深层、遥远情感的愿景。
 
-源代码
-backend/app/api/endpoints/chat.py
+- **问：MQL语言难学吗？**
+- **答：** 不难。它的设计哲学是“自然语言优先”，语法非常接近普通的英语问句。
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from ...core.grpc_client import grpc_client_manager
-import logging
+## 5. 重要警告
 
-logger = logging.getLogger(__name__)
-router = APIRouter()
-
-@router.websocket("/ws")
-async def websocket_chat(websocket: WebSocket):
-    await websocket.accept()
-    logger.info(f"WebSocket connection accepted from: {websocket.client}")
-
-    if not grpc_client_manager.stub:
-        try:
-            await grpc_client_manager.connect()
-        except Exception as e:
-            await websocket.send_text("[System Error: Could not connect to AI service.]")
-            await websocket.close()
-            return
-
-    try:
-        while True:
-            user_query = await websocket.receive_text()
-            user_query = user_query.strip()
-            if not user_query:
-                continue
-
-            try:
-                # ★ 修正：直接发送从gRPC收到的token，不再做.strip()处理
-                async for token in grpc_client_manager.chat(user_query):
-                    await websocket.send_text(token)
-            except Exception as e:
-                logger.error(f"An error occurred during chat stream: {e}", exc_info=True)
-                await websocket.send_text(f"[System Error: {e}]")
-            finally:
-                # 发送结束信号
-                await websocket.send_text("[DONE]")
-                logger.info("Chat stream finished.")
-
-    except WebSocketDisconnect:
-        logger.info(f"Client disconnected: {websocket.client}")
-    except Exception as e:
-        logger.error(f"An unexpected error occurred in the WebSocket handler: {e}", exc_info=True)
-
-
-按照下面的方案你看行不行
-需要重构 chat.py，并可能需要在 knowledge_base.py 中增加向量检索的功能。
-
-下面我为你提供一套完整的、带有详尽说明的解决方案。
-
-第一步：为知识库服务增加“检索”能力
-首先，我们需要让 KnowledgeBaseService 不仅能存文档，还要能根据一个问题（的向量）来检索相关的文档内容。这通常需要一个向量数据库的客户端。
-
-修改文件：backend/app/services/knowledge_base.py
-
-你需要引入 chromadb 客户端，并添加一个 search 方法。
-
-Python
-
-# backend/app/services/knowledge_base.py
-
-import os
-import shutil
-from typing import List, Optional
-import chromadb # <--- 1. 导入 chromadb
-from .embedding import embedding_model
-
-# --- 2. 初始化 ChromaDB 客户端 ---
-# 我们假设 ChromaDB 运行在 docker-compose 定义的 "vector-db" 服务上
-CHROMA_HOST = os.getenv("VECTOR_DB_HOST", "localhost")
-CHROMA_PORT = int(os.getenv("VECTOR_DB_PORT", 8001))
-# 使用HTTP客户端连接到ChromaDB容器
-chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
-# 创建或获取一个名为 "knowledge_base" 的集合（collection）
-# 这是存储所有文档向量的地方
-collection = chroma_client.get_or_create_collection(name="knowledge_base")
-
-
-class KnowledgeBaseService:
-    """
-    本地知识库服务，现在集成了向量存储和检索。
-    """
-
-    def __init__(self, storage_dir: str = "./knowledge_base_docs"):
-        self.storage_dir = storage_dir
-        os.makedirs(self.storage_dir, exist_ok=True)
-
-    def add_document(self, file_name: str, file_data: bytes):
-        """上传文档，并将其内容向量化后存入 ChromaDB"""
-        file_path = os.path.join(self.storage_dir, file_name)
-        with open(file_path, "wb") as f:
-            f.write(file_data)
-        
-        # 将文档内容解码为文本
-        try:
-            text_content = file_data.decode("utf-8")
-        except UnicodeDecodeError:
-            text_content = file_data.decode("gbk", errors="ignore")
-
-        # 将文档内容向量化
-        embeddings = embedding_model.embed(text_content)
-        
-        # 将向量、文档内容和元数据存入ChromaDB
-        # 我们使用文件名作为文档的ID
-        collection.add(
-            embeddings=[embeddings[0]], # embed()返回一个列表，我们取第一个
-            documents=[text_content],
-            metadatas=[{"source": file_name}],
-            ids=[file_name]
-        )
-        return True
-    
-    # --- 3. 新增核心的检索方法 ---
-    def search(self, query: str, n_results: int = 2) -> List[str]:
-        """
-        根据用户问题，在向量数据库中检索最相关的文档片段。
-        """
-        # 将用户问题向量化
-        query_embedding = embedding_model.embed(query)[0]
-        
-        # 在ChromaDB中执行向量查询
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=n_results
-        )
-        
-        # 返回检索到的文档内容列表
-        return results.get('documents', [[]])[0]
-
-    # ... 其他方法 (list_documents, get_document, etc.) 保持不变 ...
-    def list_documents(self) -> List[str]:
-        """列出知识库中所有文档名"""
-        return [
-            f for f in os.listdir(self.storage_dir)
-            if os.path.isfile(os.path.join(self.storage_dir, f))
-        ]
-
-    def get_document(self, file_name: str) -> Optional[bytes]:
-        """获取文档内容（可做预览/下载）"""
-        file_path = os.path.join(self.storage_dir, file_name)
-        if not os.path.exists(file_path):
-            return None
-        with open(file_path, "rb") as f:
-            return f.read()
-
-    def delete_document(self, file_name: str) -> bool:
-        """删除指定文档，并从ChromaDB中删除"""
-        file_path = os.path.join(self.storage_dir, file_name)
-        if not os.path.exists(file_path):
-            return False
-        
-        # 从本地文件系统删除
-        os.remove(file_path)
-        
-        # 从ChromaDB中删除
-        collection.delete(ids=[file_name])
-        
-        return True
-
-
-kb_service = KnowledgeBaseService()
-说明:
-
-你需要先安装 chromadb-client：pip install chromadb-client。然后将它添加到 backend/requirements.txt 文件中。
-
-我们现在在 add_document 时，不仅保存文件，还立刻将其向量化并存入 ChromaDB。
-
-核心是新的 search 方法，它接收一个文本查询，将其向量化，然后在 ChromaDB 中找到最相似的几个文档内容并返回。
-
-第二步：改造聊天端点以执行RAG流程
-现在我们有了检索能力，可以重构聊天处理逻辑了。
-
-修改文件：backend/app/api/endpoints/chat.py
-
-Python
-
-# backend/app/api/endpoints/chat.py
-
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from ...core.grpc_client import grpc_client_manager
-from ...services.knowledge_base import kb_service # <--- 1. 导入知识库服务
-import logging
-
-logger = logging.getLogger(__name__)
-router = APIRouter()
-
-# --- 2. 定义一个函数来构建最终的 Prompt ---
-def build_prompt_with_context(query: str, context: list[str]) -> str:
-    """将用户问题和检索到的上下文拼接成一个增强的Prompt"""
-    if not context:
-        # 如果没有检索到任何上下文，就直接返回原问题
-        return query
-
-    context_str = "\n\n".join(context)
-    
-    # 这是一个高质量的Prompt模板
-    prompt = f"""
-    请根据以下提供的上下文信息来回答用户的问题。请确保你的回答完全基于这些信息，不要使用任何外部知识。如果上下文信息不足以回答问题，请直接说“根据我掌握的知识，我无法回答这个问题”。
-
-    上下文信息:
-    ---
-    {context_str}
-    ---
-
-    用户的问题:
-    {query}
-    """
-    return prompt.strip()
-
-
-@router.websocket("/ws")
-async def websocket_chat(websocket: WebSocket):
-    await websocket.accept()
-    logger.info(f"WebSocket connection accepted from: {websocket.client}")
-
-    # 省略gRPC连接检查...
-
-    try:
-        while True:
-            user_query = await websocket.receive_text()
-            user_query = user_query.strip()
-            if not user_query:
-                continue
-
-            try:
-                # --- 3. 执行完整的RAG流程 ---
-                
-                # 第1步: 在知识库中检索相关文档
-                logger.info(f"正在为查询 '{user_query}' 检索知识库...")
-                retrieved_context = kb_service.search(user_query, n_results=2)
-                if retrieved_context:
-                    logger.info(f"检索到 {len(retrieved_context)} 条相关上下文。")
-                else:
-                    logger.warning("未能检索到任何相关上下文。")
-
-                # 第2步: 构建增强后的Prompt
-                final_prompt = build_prompt_with_context(user_query, retrieved_context)
-                
-                # 第3步: 将增强后的Prompt发送给大模型
-                logger.info("正在将增强后的Prompt发送到gRPC服务进行生成...")
-                async for token in grpc_client_manager.chat(final_prompt):
-                    await websocket.send_text(token)
-
-            except Exception as e:
-                logger.error(f"聊天流处理中发生错误: {e}", exc_info=True)
-                await websocket.send_text(f"[系统错误: {e}]")
-            finally:
-                # 发送结束信号
-                await websocket.send_text("[DONE]")
-                logger.info("聊天流结束。")
-
-    except WebSocketDisconnect:
-        logger.info(f"客户端断开连接: {websocket.client}")
-    except Exception as e:
-        logger.error(f"WebSocket处理程序中发生意外错误: {e}", exc_info=True)
+**绝对禁止**在情感核心未达到稳定运行状态（温度低于5开尔文）时，直接向其注入高密度情感数据流。这样做曾导致2025年第一季度的“回声风暴”事件，造成了三天的数据混乱。

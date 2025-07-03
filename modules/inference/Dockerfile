@@ -1,47 +1,44 @@
-# 使用官方的 NVIDIA CUDA 基础镜像
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
-# 1. 安装系统依赖
-# 更新包列表并安装 Python、pip 和编译工具
+RUN sed -i 's@http://archive.ubuntu.com/ubuntu@https://mirrors.aliyun.com/ubuntu@g' /etc/apt/sources.list \
+ && sed -i 's@http://security.ubuntu.com/ubuntu@https://mirrors.aliyun.com/ubuntu@g' /etc/apt/sources.list
+
 RUN apt-get update && apt-get install -y \
     python3.10 \
     python3-pip \
     git \
     cmake \
     build-essential \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. 设置工作目录
+RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/lib/x86_64-linux-gnu/libcuda.so.1 || true
+
 WORKDIR /app
 
-# 3. 复制并安装 Python 依赖
-# 首先只复制依赖文件以利用 Docker 缓存
 COPY ./modules/inference/requirements.txt .
 
-# 设置环境变量，强制 llama-cpp-python 在编译时启用 CUDA
 ENV CMAKE_ARGS="-DGGML_CUDA=on"
 ENV FORCE_CMAKE=1
 
-# 安装所有 Python 依赖
-# pip 会首先读取 requirements.txt 中的 --index-url 来安装 torch
-RUN python3 -m pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN python3 -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN pip install torch --extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple --extra-index-url https://download.pytorch.org/whl/cu121
+RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 4. 复制 .proto 文件
-# 确保 docker-compose.yml 中的构建上下文是项目根目录 (context: .)
-COPY ./protos ./protos
+# 拷贝 inference proto 文件
+COPY ./modules/inference/app/protos/inference.proto ./protos/inference.proto
 
-# 5. 编译 .proto 文件为 Python 代码
-RUN python3 -m grpc_tools.protoc -I./protos --python_out=. --grpc_python_out=. ./protos/*.proto
+# 创建 proto 输出目录并加 __init__.py
+RUN mkdir -p ./app/protos && touch ./app/protos/__init__.py
 
-# 6. 复制应用代码
+# 编译 proto
+RUN python3 -m grpc_tools.protoc -I./protos --python_out=./app/protos --grpc_python_out=./app/protos ./protos/inference.proto
+
+# 拷贝主 app 代码
 COPY ./modules/inference/app ./app
 
-# 7. 设置 Python 路径，以便能正确找到模块
-ENV PYTHONPATH="${PYTHONPATH}:/app"
+ENV PYTHONPATH="${PYTHONPATH}:/app/app"
 
-# 暴露 gRPC 服务的端口
 EXPOSE 50051
 
-# 启动应用的命令
 CMD ["python3", "-m", "app.main"]

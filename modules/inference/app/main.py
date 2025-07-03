@@ -7,39 +7,30 @@ import time
 import json
 from enum import Enum
 
-# 导入 gRPC 生成的代码 (修正了路径)
 import protos.inference_pb2 as inference_pb2
 import protos.inference_pb2_grpc as inference_pb2_grpc
 from grpc_reflection.v1alpha import reflection
 
-# 导入项目模块 (修正了路径)
-# 假设 config.py 和 utils.py 与 main.py 在同一个 app 文件夹下
 from config import MAX_TOKENS, EARLY_STOP_TOKENS
 from utils import IS_GPU_AVAILABLE
 
-# 导入第三方库
 from llama_cpp import Llama
 from sentence_transformers import SentenceTransformer
 from diskcache import Cache
 
-# --- 日志记录配置 ---
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(threadName)s %(name)s %(levelname)s %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# --- 常量 ---
-# 这个路径将从 docker-compose.yml 中挂载
 MODELS_PATH = "/models/"
-
 
 class ModelStatus(Enum):
     IDLE = "IDLE"
     LOADING = "LOADING"
     READY = "READY"
     ERROR = "ERROR"
-
 
 def detect_model_type(model_name, loaded_model=None):
     lower = model_name.lower()
@@ -61,7 +52,6 @@ def detect_model_type(model_name, loaded_model=None):
             return cf.lower()
     return "llama"
 
-
 def build_prompt_qwen(messages):
     prompt = ""
     for msg in messages:
@@ -71,7 +61,6 @@ def build_prompt_qwen(messages):
             prompt += f"<|im_start|>assistant\n{msg['content']}<|im_end|>\n"
     prompt += "<|im_start|>assistant\n"
     return prompt
-
 
 class ModelManager:
     _instance = None
@@ -95,7 +84,7 @@ class ModelManager:
         self.embedding_model = None
         self.embedding_model_name = ""
         self.lock = threading.Lock()
-        self.cache = Cache("/app/.cache") # 将缓存放在 app 目录下
+        self.cache = Cache("/app/.cache")
         self.initialized = True
         logger.info("模型管理器初始化完成。")
 
@@ -146,19 +135,25 @@ class ModelManager:
 
     def _load_embedding_model(self):
         try:
-            # 优先从本地挂载的 /models 目录加载，如果不存在，则从 HuggingFace 下载
-            # 注意：这需要你将模型文件夹命名为 'BAAI/bge-base-zh-v1.5'
-            embed_model_path = os.path.join(
-                MODELS_PATH, "embedding-model"
-            )
-            if not os.path.isdir(embed_model_path):
-                 logger.warning(f"本地嵌入模型目录 {embed_model_path} 未找到，将从 HuggingFace 下载。")
-                 embed_model_path = "BAAI/bge-base-zh-v1.5"
+            embedding_root = os.path.join(MODELS_PATH, "embedding-model")
+            embed_model_path = None
+            if os.path.isdir(embedding_root):
+                candidates = [os.path.join(embedding_root, d)
+                              for d in os.listdir(embedding_root)
+                              if os.path.isdir(os.path.join(embedding_root, d))]
+                if candidates:
+                    embed_model_path = candidates[0]
+                    logger.info(f"发现并加载本地嵌入模型: {embed_model_path}")
+                else:
+                    logger.warning(f"{embedding_root} 下未发现子目录，将回退到 HuggingFace 下载。")
+            if not embed_model_path:
+                embed_model_path = "BAAI/bge-base-zh-v1.5"
+                logger.info(f"使用 HuggingFace 下载模型: {embed_model_path}")
 
             device = "cuda" if IS_GPU_AVAILABLE else "cpu"
             self.embedding_model = SentenceTransformer(embed_model_path, device=device)
-            self.embedding_model_name = "BAAI/bge-base-zh-v1.5"
-            logger.info("加载嵌入模型成功")
+            self.embedding_model_name = os.path.basename(embed_model_path)
+            logger.info(f"嵌入模型加载成功: {self.embedding_model_name}")
         except Exception as e:
             logger.error(f"加载嵌入模型出错: {e}", exc_info=True)
 
@@ -179,8 +174,8 @@ class ModelManager:
             return {"status": "loading_started", "name": new_model_name}
 
     def compress_history(
-        self, messages: list[dict], max_length: int = 4096, keep_last: int = 4
-    ) -> list[dict]:
+        self, messages: list, max_length: int = 4096, keep_last: int = 4
+    ) -> list:
         total_len = sum(len(msg["content"]) for msg in messages)
 
         if total_len <= max_length:
@@ -208,7 +203,7 @@ class ModelManager:
         logger.info(f"History compressed. New length: {len(new_history)} messages.")
         return new_history
 
-    def infer_stream(self, messages: list[dict]):
+    def infer_stream(self, messages: list):
         if self.status != ModelStatus.READY or not self.model:
             raise RuntimeError("模型未就绪")
 
@@ -234,9 +229,13 @@ class ModelManager:
 
         self.cache[cache_key] = full_response
 
+    def get_embeddings_batch(self, texts):
+        if not self.embedding_model:
+            raise RuntimeError("嵌入模型未加载")
+        vectors = self.embedding_model.encode(texts, normalize_embeddings=True)
+        return vectors
 
 model_manager = ModelManager()
-
 
 class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
     def ListAvailableModels(self, request, context):
@@ -266,12 +265,17 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
 
     def SwitchModel(self, request, context):
         res = model_manager.switch_model(request.model_name)
+        success = res["status"] in ("loading_started", "already_loaded")
+        msg = res.get("message", "") or res["status"]
         return inference_pb2.SwitchModelResponse(
-            success=res["status"] in ("loading_started", "already_loaded"),
-            message=res.get("message", ""),
+            success=success,
+            message=msg,
         )
 
     def ChatStream(self, request, context):
+        """
+        流式对话接口实现
+        """
         try:
             messages = [
                 {"role": msg.role, "content": msg.content} for msg in request.messages
@@ -279,29 +283,34 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
             for token in model_manager.infer_stream(messages):
                 yield inference_pb2.ChatResponse(token=token)
         except Exception as e:
-            logger.error(f"Chat 异常: {e}", exc_info=True)
+            logger.error(f"ChatStream 异常: {e}", exc_info=True)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             yield inference_pb2.ChatResponse(error_message=str(e))
 
     def GetEmbeddingsBatch(self, request, context):
+        """
+        批量获取文本embedding
+        """
         if not model_manager.embedding_model:
             context.set_code(grpc.StatusCode.UNAVAILABLE)
             context.set_details("嵌入模型未加载。")
             return inference_pb2.EmbeddingBatchResponse()
         try:
-            vectors = model_manager.embedding_model.encode(
-                request.texts, normalize_embeddings=True
-            )
+            texts = list(request.texts)
+            vectors = model_manager.get_embeddings_batch(texts)
+            # 注意proto结构！！如果你的proto不是values, 请调整
             return inference_pb2.EmbeddingBatchResponse(
-                embeddings=[inference_pb2.Embedding(values=v.tolist()) for v in vectors]
+                embeddings=[
+                    inference_pb2.Embedding(values=list(map(float, v)))
+                    for v in vectors
+                ]
             )
         except Exception as e:
             logger.error(f"生成嵌入向量时出错: {e}", exc_info=True)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f"生成嵌入向量时出错: {e}")
             return inference_pb2.EmbeddingBatchResponse()
-
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -340,11 +349,10 @@ def serve():
 
     try:
         while True:
-            time.sleep(86400)  # 一天的秒数
+            time.sleep(86400)
     except KeyboardInterrupt:
         logger.info("收到关闭信号，正在停止服务器...")
         server.stop(0)
-
 
 if __name__ == "__main__":
     serve()
