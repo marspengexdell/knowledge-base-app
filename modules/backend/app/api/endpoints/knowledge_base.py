@@ -1,24 +1,92 @@
-from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Any
+import os
+import logging
+import uuid
+from typing import List, Optional, Dict
+from langchain_core.documents import Document
+from core.db_client import vector_db
+from services.embedding import embedding_model
 
-from services.knowledge_base import kb_service
+logger = logging.getLogger(__name__)
 
-router = APIRouter()
+class KnowledgeBaseService:
+    def __init__(self, storage_dir: Optional[str] = None) -> None:
+        self.storage_dir = storage_dir or os.getenv("KNOWLEDGE_BASE_DOCS", "/knowledge_base_docs")
+        os.makedirs(self.storage_dir, exist_ok=True)
+        logger.info(f"Knowledge base storage directory: {self.storage_dir}")
 
+    def add_document(self, file_name: str, file_data: bytes) -> str:
+        doc_id = str(uuid.uuid4())
+        file_path = os.path.join(self.storage_dir, doc_id + ".txt")
+        with open(file_path, "wb") as f:
+            f.write(file_data)
+        logger.info(f"Document '{file_name}' saved as '{file_path}' with UUID {doc_id}")
+        return doc_id
 
-@router.get("/documents", response_model=List[Dict[str, Any]])
-async def list_documents():
-    """获取所有已上传的文档列表。"""
-    documents = await kb_service.list_all_documents()
-    if documents is None:
-        raise HTTPException(status_code=500, detail="无法从知识库获取文档列表")
-    return documents
+    async def embed_document(self, doc_id: str, original_name: str) -> bool:
+        file_path = os.path.join(self.storage_dir, doc_id + ".txt")
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(file_path)
 
+        with open(file_path, "rb") as f:
+            data = f.read()
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            text = data.decode("gbk", errors="ignore")
 
-@router.delete("/documents/{source_name}")
-async def delete_document(source_name: str):
-    """根据文件名删除知识库中的一个文档。"""
-    success = await kb_service.delete_documents_by_source(source_name)
-    if not success:
-        raise HTTPException(status_code=500, detail=f"删除文档 '{source_name}' 失败")
-    return {"message": f"文档 '{source_name}' 已成功删除"}
+        doc = Document(page_content=text, metadata={"id": doc_id, "source": original_name})
+        embedding = await embedding_model.embed(text)
+        await vector_db.add_documents([doc], [embedding], doc_id)
+        logger.info(f"Document '{doc_id}' embedded and stored")
+        return True
+
+    async def delete_documents_by_id(self, doc_id: str) -> bool:
+        file_path = os.path.join(self.storage_dir, doc_id + ".txt")
+        if not os.path.exists(file_path):
+            return False
+        os.remove(file_path)
+        try:
+            vector_db.delete_documents_by_source(doc_id)
+        except Exception:
+            logger.warning("Failed to delete document from vector DB", exc_info=True)
+        logger.info(f"Document '{doc_id}' deleted")
+        return True
+
+    def _load_doc_meta(self) -> List[Dict]:
+        docs = []
+        for file in os.listdir(self.storage_dir):
+            if not file.endswith(".txt"):
+                continue
+            doc_id = file.replace(".txt", "")
+            path = os.path.join(self.storage_dir, file)
+            if os.path.isfile(path):
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read(5000)
+
+                # ✅ 仅展示前 50 个字符
+                preview = content.strip().replace('\n', '').replace('\r', '')
+                preview = preview[:50] + '...' if len(preview) > 50 else preview
+
+                docs.append({
+                    "id": doc_id,
+                    "title": file,
+                    "content": preview
+                })
+        return docs
+
+    async def paginated_list(self, page: int, page_size: int, search: str, by: str):
+        all_docs = self._load_doc_meta()
+        if search:
+            def match(doc):
+                s = search.lower()
+                return (s in doc["title"].lower() if by in ("title", "all") else False) or \
+                       (s in doc["content"].lower() if by in ("content", "all") else False)
+            all_docs = [doc for doc in all_docs if match(doc)]
+        all_docs.sort(key=lambda d: d["title"])
+        total = len(all_docs)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_docs = all_docs[start:end]
+        return {"total": total, "docs": page_docs}
+
+kb_service = KnowledgeBaseService()

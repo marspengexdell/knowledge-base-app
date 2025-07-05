@@ -44,8 +44,7 @@ import { ref } from 'vue';
 const navItems = ref([
   { name: '仪表盘', path: '/admin' }, // 将路径修改为 /admin
   { name: '模型管理', path: '/admin/model-management' },
-  { name: '知识库上传', path: '/admin/knowledge-base' },
-  { name: '文档管理', path: '/admin/document-management' },
+  { name: '知识库管理', path: '/admin/knowledge-base' },
 ]);
 </script>
 

@@ -1,33 +1,32 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from services.knowledge_base import kb_service
 
 router = APIRouter()
 
 @router.get("/documents")
-async def list_documents():
-    """列出所有知识库中的文档。"""
-    docs = await kb_service.list_all_documents()
-    return docs or []
+async def list_documents(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    search: str = Query("", description="搜索关键词"),
+    by: str = Query("all", regex="^(title|content|all)$")
+):
+    return await kb_service.paginated_list(page, page_size, search, by)
 
 @router.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
-    """
-    上传并学习（向量化）一个新文档。
-    """
     try:
         data = await file.read()
-        kb_service.add_document(file.filename, data)
-        await kb_service.embed_document(file.filename)
-        return {"success": True, "message": f"文档 '{file.filename}' 上传并学习完成！"}
+        doc_id = kb_service.add_document(file.filename, data)
+        await kb_service.embed_document(doc_id, file.filename)
+        return {"success": True, "message": f"文档 '{file.filename}' 上传成功", "id": doc_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"上传失败: {e}")
 
-@router.delete("/documents/{source_name}")
-async def delete_document(source_name: str):
-    """
-    删除指定文档（从文件夹和向量库一并移除）。
-    """
-    ok = await kb_service.delete_documents_by_source(source_name)
-    if not ok:
-        raise HTTPException(status_code=500, detail=f"删除文档 '{source_name}' 失败")
-    return {"success": True, "message": f"文档 '{source_name}' 已成功删除"}
+@router.delete("/documents/{doc_id}")
+async def delete_document(doc_id: str):
+    if not doc_id or doc_id == "undefined":
+        raise HTTPException(status_code=400, detail="Invalid document ID")
+    success = await kb_service.delete_documents_by_id(doc_id)
+    if not success:
+        raise HTTPException(status_code=500, detail=f"删除失败: ID {doc_id}")
+    return {"success": True, "message": f"文档已删除: {doc_id}"}
