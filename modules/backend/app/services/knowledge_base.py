@@ -62,7 +62,9 @@ class KnowledgeBaseService:
             if os.path.isfile(path):
                 with open(path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read(5000)
-                docs.append({"id": doc_id, "title": file, "content": content})
+                preview = content.strip().replace('\n', '').replace('\r', '')
+                preview = preview[:50] + '...' if len(preview) > 50 else preview
+                docs.append({"id": doc_id, "title": file, "content": preview})
         return docs
 
     async def paginated_list(self, page: int, page_size: int, search: str, by: str):
@@ -79,5 +81,13 @@ class KnowledgeBaseService:
         end = start + page_size
         page_docs = all_docs[start:end]
         return {"total": total, "docs": page_docs}
+
+    async def search(self, query: str, n_results: int = 3) -> List[Document]:
+        try:
+            results = await vector_db.asimilarity_search(query, k=n_results)
+            return results
+        except Exception as e:
+            logger.error(f"知识库搜索失败: {e}", exc_info=True)
+            return []
 
 kb_service = KnowledgeBaseService()
