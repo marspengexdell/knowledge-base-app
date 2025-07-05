@@ -15,7 +15,6 @@ class ChatService:
         await websocket.accept()
         await websocket.send_json({"session_id": session_id, "event": "[ID]", "token": session_id})
 
-        # Step 1: 查询知识库（向量库）
         logger.info(f"正在为问题 '{query}' 检索知识库...")
         context_docs = await kb_service.search(query=query, n_results=3)
         context_docs = [doc for doc in context_docs if doc.page_content and doc.page_content.strip()]
@@ -35,16 +34,14 @@ class ChatService:
             messages.append({"role": "system", "content": prompt})
         else:
             logger.info("知识库未命中，直接用AI大模型自由答。")
-            # 什么都不拼，直接用用户原始问题作为消息
             messages.append({"role": "user", "content": query})
 
-        # 构建 gRPC 请求
+
         grpc_req = inference_pb2.ChatRequest(
             messages=[inference_pb2.Message(role=m["role"], content=m["content"]) for m in messages],
             session_id=session_id,
         )
 
-        # 流式返回
         async for chunk in grpc_client_manager.chat(grpc_req):
             await websocket.send_json({"event": "[DATA]", "token": chunk})
 
