@@ -68,11 +68,14 @@ class GrpcClientManager:
             "device": getattr(resp, "device", ""),
         }
 
-    async def switch_model(self, model_name: str, model_type_enum):
+    async def switch_model(
+        self, model_name: str, model_type: inference_pb2.ModelType
+    ):
         if not self.stub:
             raise ConnectionError("gRPC not connected")
         req = inference_pb2.SwitchModelRequest(
-            model_name=model_name, model_type=model_type_enum
+            model_name=model_name,
+            model_type=model_type,
         )
         resp = await self.stub.SwitchModel(req)
         return resp.success, resp.message

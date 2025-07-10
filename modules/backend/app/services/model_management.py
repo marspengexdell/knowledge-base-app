@@ -59,7 +59,7 @@ class ModelManager:
             return False, f"Model file not found: {model_name}"
         try:
             success, msg = await self.grpc_client_manager.switch_model(
-                model_name, inference_pb2.ModelType.GENERATION
+                model_name, model_type=inference_pb2.ModelType.GENERATION
             )
             logger.info(f"switch_model grpc response: success={success}, msg={msg}")
             if success:
