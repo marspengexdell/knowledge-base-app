@@ -42,11 +42,3 @@ app.include_router(api_router, prefix="/api")
 @app.get("/")
 def read_root():
     return {"message": "后端启动成功！"}
-def SwitchModel(self, request, context):
-    logger.info(f"收到 SwitchModel 请求: {request.model_name}")
-    res = model_manager.switch_model(request.model_name)
-    logger.info(f"SwitchModel 响应: {res}")
-    return inference_pb2.SwitchModelResponse(
-        success=res["status"] in ("loading_started", "already_loaded"),
-        message=res.get("message", ""),
-    )
