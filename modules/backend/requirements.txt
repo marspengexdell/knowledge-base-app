@@ -20,3 +20,5 @@ unstructured
 python-docx
 pypdf
 langchain-text-splitters
+pdfplumber
+python-docx

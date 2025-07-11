@@ -13,17 +13,22 @@ class ModelService:
     def __init__(self) -> None:
         self.model_dir = Path(settings.MODEL_DIR)
         self.active_file = Path("/models/active_models.json")
+        self.model_dir.mkdir(parents=True, exist_ok=True)
 
-    def upload_model(self, file: UploadFile) -> dict:
-        """Save uploaded model file under the model directory."""
+    async def upload_model(self, file: UploadFile) -> dict:
+        """保存上传的模型文件（支持超大文件，采用流式写入）"""
         if not (file.filename.endswith(".gguf") or file.filename.endswith(".safetensors")):
             return {"success": False, "message": "只允许上传 .gguf 或 .safetensors 文件"}
-        self.model_dir.mkdir(parents=True, exist_ok=True)
+
         dest = self.model_dir / file.filename
-        content = file.file.read()
-        with open(dest, "wb") as f:
-            f.write(content)
-        return {"success": True, "message": f"模型 {file.filename} 上传成功"}
+
+        try:
+            with open(dest, "wb") as f:
+                while chunk := await file.read(1024 * 1024):  # 每次读取 1MB 块
+                    f.write(chunk)
+            return {"success": True, "message": f"模型 {file.filename} 上传成功"}
+        except Exception as e:
+            return {"success": False, "message": f"模型保存失败：{str(e)}"}
 
     def _load_active(self) -> dict:
         if self.active_file.exists():

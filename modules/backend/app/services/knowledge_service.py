@@ -1,10 +1,13 @@
 import os
 import logging
 import uuid
+import io
 from typing import List, Optional, Dict
 from langchain_core.documents import Document
 from core.db_client import vector_db
 from services.embedding import embedding_model
+import pdfplumber
+from docx import Document as DocxDocument
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +17,25 @@ class KnowledgeService:
         os.makedirs(self.storage_dir, exist_ok=True)
         logger.info(f"Knowledge base storage directory: {self.storage_dir}")
 
-    def add_document(self, file_name: str, file_data: bytes) -> str:
-        doc_id = str(uuid.uuid4())
+    def _extract_text(self, file_bytes: bytes, file_name: str) -> str:
+        suffix = file_name.lower().split(".")[-1]
+        if suffix in ["txt", "md"]:
+            return file_bytes.decode("utf-8", errors="ignore")
+        elif suffix == "pdf":
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                return "\n".join([page.extract_text() or "" for page in pdf.pages])
+        elif suffix == "docx":
+            doc = DocxDocument(io.BytesIO(file_bytes))
+            return "\n".join([para.text for para in doc.paragraphs])
+        else:
+            raise ValueError("不支持的文件类型")
+
+    def add_document(self, file_name: str, file_bytes: bytes, doc_id: Optional[str] = None) -> str:
+        doc_id = doc_id or str(uuid.uuid4())
+        text = self._extract_text(file_bytes, file_name)
         file_path = os.path.join(self.storage_dir, doc_id + ".txt")
-        with open(file_path, "wb") as f:
-            f.write(file_data)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(text)
         logger.info(f"Document '{file_name}' saved as '{file_path}' with UUID {doc_id}")
         return doc_id
 
@@ -27,12 +44,8 @@ class KnowledgeService:
         if not os.path.isfile(file_path):
             raise FileNotFoundError(file_path)
 
-        with open(file_path, "rb") as f:
-            data = f.read()
-        try:
-            text = data.decode("utf-8")
-        except UnicodeDecodeError:
-            text = data.decode("gbk", errors="ignore")
+        with open(file_path, "r", encoding="utf-8") as f:
+            text = f.read()
 
         doc = Document(page_content=text, metadata={"id": doc_id, "source": original_name})
         embedding = await embedding_model.embed(text)

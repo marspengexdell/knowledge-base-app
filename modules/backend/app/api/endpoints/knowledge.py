@@ -11,7 +11,74 @@ logger = logging.getLogger(__name__)
 
 @router.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
-    """
+    """import os
+import logging
+import io
+import pdfplumber
+from pathlib import Path
+from docx import Document
+
+logger = logging.getLogger(__name__)
+
+
+class KnowledgeBaseService:
+    def __init__(self):
+        self.storage_dir = "storage/documents"
+        Path(self.storage_dir).mkdir(parents=True, exist_ok=True)
+        self.docs = {}
+
+    def extract_text(self, file_bytes: bytes, filename: str) -> str:
+        suffix = filename.lower().split('.')[-1]
+        if suffix in ["txt", "md"]:
+            return file_bytes.decode("utf-8", errors="ignore")
+
+        elif suffix == "pdf":
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                return "\n".join([page.extract_text() or "" for page in pdf.pages])
+
+        elif suffix == "docx":
+            doc = Document(io.BytesIO(file_bytes))
+            return "\n".join([para.text for para in doc.paragraphs])
+
+        else:
+            raise ValueError("不支持的文件类型")
+
+    def add_document(self, filename: str, file_bytes: bytes):
+        # 保存原始文件
+        file_path = os.path.join(self.storage_dir, filename)
+        with open(file_path, "wb") as f:
+            f.write(file_bytes)
+
+        # 提取文本（关键改造）
+        try:
+            text = self.extract_text(file_bytes, filename)
+        except Exception as e:
+            logger.error(f"提取文本失败: {e}")
+            raise RuntimeError(f"不支持或解析失败的文件: {e}")
+
+        # 保存到内存（用于 embed）
+        self.docs[filename] = text
+
+    def list_documents(self):
+        return list(self.docs.keys())
+
+    def delete_document(self, filename: str) -> bool:
+        path = os.path.join(self.storage_dir, filename)
+        if os.path.exists(path):
+            os.remove(path)
+        return self.docs.pop(filename, None) is not None
+
+    async def embed_document(self, filename: str):
+        # 假设调用 embedding 向量存储接口
+        from core.embedding import embed_text  # 伪代码
+        text = self.docs.get(filename)
+        if not text:
+            raise RuntimeError("找不到文档内容")
+        await embed_text(filename, text)
+
+
+kb_service = KnowledgeBaseService()
+
     接收上传的文档，保存后立即进行向量化处理。
     """
     try:
