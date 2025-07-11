@@ -39,8 +39,10 @@ const deleting = ref({});
 const fetchDocuments = async () => {
   loading.value = true; error.value = null;
   try {
-    const response = await axios.get('/api/admin/kb/documents'); 
-    documents.value = response.data;
+    const response = await axios.get('/api/admin/kb/documents');
+    documents.value = response.data.docs || [];
+    // If pagination is implemented later, response.data.total can be used
+    // to update a `total` ref for page controls.
   } catch (err) { error.value = err.response?.data?.detail || err.message; }
   finally { loading.value = false; }
 };
