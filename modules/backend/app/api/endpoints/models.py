@@ -1,11 +1,7 @@
-
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Body
 from core.grpc_client import grpc_client_manager
 from protos import inference_pb2
-import os
-import shutil
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Body
 from services.model_service import model_service
 
 
@@ -21,8 +17,6 @@ async def list_models():
         models = await grpc_client_manager.list_models()
         return models
 
-        return model_service.list_models()
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -33,15 +27,15 @@ async def load_model(model_name: str, model_type: str = Body("generation")):
     触发加载指定模型，返回是否成功和消息
     """
     try:
+        if model_type.lower() == "embedding":
+            model_enum = inference_pb2.ModelType.EMBEDDING
+        else:
+            model_enum = inference_pb2.ModelType.GENERATION
 
-        success, msg = await grpc_client_manager.switch_model(
-            model_name, inference_pb2.ModelType.GENERATION
-        )
-
-        success, msg = await model_service.switch_model(model_name, model_type)
+        success, loading, msg = await model_service.switch_model(model_name, model_enum)
 
         if not success:
-            if "loading_busy" in (msg or ""):
+            if loading:
                 raise HTTPException(status_code=202, detail="模型正在加载，请稍后再试。")
             raise HTTPException(status_code=500, detail=msg or "切换模型失败")
         return {"success": True, "message": f"Model '{model_name}' 已切换"}
