@@ -82,17 +82,19 @@ defined, generation stops early whenever the substring appears in the output.
 
 ### Switching Models via API
 
-The backend exposes a `POST /api/admin/models/switch` endpoint. The request body
-must be JSON in the following form:
+Use `POST /api/admin/models/load/{model_name}` to load a different generation
+model. Replace `{model_name}` with the file name of a model located in the
+`models/` directory. No request body is required unless you want to specify a
+different `model_type`.
 
-```json
-{
-  "model_name": "your-model-file.gguf"
-}
+For example, to activate `my-model.gguf`:
+
+```bash
+curl -X POST http://localhost:8000/api/admin/models/load/my-model.gguf
 ```
 
-The backend will update `models/active_models.json` with the selected
-generation model.
+The backend updates `models/active_models.json` once the model has been
+successfully loaded.
 
 ### Managing Knowledge Documents
 
@@ -100,19 +102,12 @@ Documents uploaded through the admin interface are saved under
 `knowledge_base_docs/`, which is mounted into the backend container for
 persistence. The following admin API endpoints are available:
 
-- `POST /api/admin/knowledge/upload` – upload a `.txt` file
-- `GET  /api/admin/knowledge/list` – list stored documents
-- `GET  /api/admin/knowledge/download?file=<name>` – download a document
-- `DELETE /api/admin/knowledge/delete?file=<name>` – remove a document
+- `POST /api/admin/kb/upload` – upload a `.txt` file
+- `GET  /api/admin/kb/documents` – list stored documents
+- `DELETE /api/admin/kb/documents/{doc_id}` – remove a document by ID
 
 The admin UI at `http://localhost:8081/knowledge-base` provides a simple file
 uploader for these operations.
-
-### Embedding API
-
-If an embedding model is loaded, the endpoint
-`GET /api/embedding/embed_doc?file_name=<name>` returns the vector embedding for
-a stored document.
 
 
 The `backend` and `inference` services use pinned Python package versions
