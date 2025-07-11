@@ -1,5 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from services.knowledge_service import knowledge_service
+from pathlib import Path
+import uuid
 
 router = APIRouter()
 
@@ -15,9 +17,18 @@ async def list_documents(
 @router.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
     try:
-        data = await file.read()
-        doc_id = knowledge_service.add_document(file.filename, data)
+        save_dir = Path("/app/data/knowledge")
+        save_dir.mkdir(parents=True, exist_ok=True)
+        unique_id = str(uuid.uuid4())
+        save_path = save_dir / f"{unique_id}_{file.filename}"
+
+        file_bytes = await file.read()
+        with open(save_path, "wb") as f:
+            f.write(file_bytes)
+
+        doc_id = knowledge_service.add_document(file.filename, file_bytes, doc_id=unique_id)
         await knowledge_service.embed_document(doc_id, file.filename)
+
         return {"success": True, "message": f"文档 '{file.filename}' 上传成功", "id": doc_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"上传失败: {e}")
