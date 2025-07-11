@@ -157,6 +157,26 @@ class ModelManager:
         except Exception as e:
             logger.error(f"加载嵌入模型出错: {e}", exc_info=True)
 
+    def switch_embedding_model(self, embed_model_path: str):
+        """Load a specific embedding model from the given path or HF repo."""
+        with self.lock:
+            if (
+                self.embedding_model is not None
+                and os.path.basename(embed_model_path) == self.embedding_model_name
+            ):
+                return {"status": "already_loaded"}
+        try:
+            device = "cuda" if IS_GPU_AVAILABLE else "cpu"
+            embedding_model = SentenceTransformer(embed_model_path, device=device)
+            with self.lock:
+                self.embedding_model = embedding_model
+                self.embedding_model_name = os.path.basename(embed_model_path)
+            logger.info(f"嵌入模型加载成功: {self.embedding_model_name}")
+            return {"status": "loaded"}
+        except Exception as e:
+            logger.error(f"加载嵌入模型出错: {e}", exc_info=True)
+            return {"status": "error", "message": str(e)}
+
     def switch_model(self, new_model_name):
         with self.lock:
             if self.status == ModelStatus.LOADING:
@@ -264,13 +284,14 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
         )
 
     def SwitchModel(self, request, context):
-        res = model_manager.switch_model(request.model_name)
-        success = res["status"] in ("loading_started", "already_loaded")
-        msg = res.get("message", "") or res["status"]
-        return inference_pb2.SwitchModelResponse(
-            success=success,
-            message=msg,
-        )
+        if request.model_type == inference_pb2.ModelType.EMBEDDING:
+            res = model_manager.switch_embedding_model(request.model_name)
+            success = res["status"] in ("loaded", "already_loaded")
+        else:
+            res = model_manager.switch_model(request.model_name)
+            success = res["status"] in ("loading_started", "already_loaded")
+        msg = res.get("message", "") or res.get("status", "")
+        return inference_pb2.SwitchModelResponse(success=success, message=msg)
 
     def ChatStream(self, request, context):
         """
