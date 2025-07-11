@@ -1,6 +1,4 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Body
-
-# 核心修正：移除所有 'app.' 前缀，使导入相对于 /app 目录
 from core.grpc_client import grpc_client_manager
 from services.knowledge_service import knowledge_service
 from services.session_service import session_service
