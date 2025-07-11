@@ -81,12 +81,17 @@ import { UploadFilled, Refresh, Tickets } from '@element-plus/icons-vue'
 const models = ref([])
 const loading = ref(false)
 
-// 获取模型列表及当前激活模型
 const fetchModels = async () => {
   loading.value = true
   try {
     const response = await axios.get('/api/admin/models')
-    models.value = response.data
+    const data = response.data
+
+    models.value = data.generation_models.map(model => ({
+      model_name: model,
+      model_path: `/models/${model}`,
+      active: model === data.current_generation_model
+    }))
   } catch (error) {
     ElMessage.error('获取模型列表失败')
     console.error(error)
@@ -95,7 +100,6 @@ const fetchModels = async () => {
   }
 }
 
-// 切换模型
 const switchModel = async (modelName) => {
   try {
     const res = await axios.post(`/api/admin/models/load/${modelName}`)
@@ -114,7 +118,6 @@ const switchModel = async (modelName) => {
   }
 }
 
-// 上传成功回调
 const handleSuccess = (response, file) => {
   if (response.success) {
     ElMessage.success(`模型 "${file.name}" 上传成功！`)
@@ -124,13 +127,11 @@ const handleSuccess = (response, file) => {
   }
 }
 
-// 上传失败回调
 const handleError = (error, file) => {
   ElMessage.error(`模型 "${file.name}" 上传失败，请检查网络或联系管理员。`)
   console.error(error)
 }
 
-// 上传前检查
 const beforeUpload = (file) => {
   const isValid = file.name.endsWith('.gguf') || file.name.endsWith('.safetensors')
   if (!isValid) {
@@ -139,7 +140,6 @@ const beforeUpload = (file) => {
   return isValid
 }
 
-// 组件加载时，自动获取一次列表
 onMounted(() => {
   fetchModels()
 })
