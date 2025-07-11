@@ -85,7 +85,7 @@ const loading = ref(false)
 const fetchModels = async () => {
   loading.value = true
   try {
-    const response = await axios.get('/api/admin/models/list')
+    const response = await axios.get('/api/admin/models')
     models.value = response.data
   } catch (error) {
     ElMessage.error('获取模型列表失败')
