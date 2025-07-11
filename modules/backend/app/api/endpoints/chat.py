@@ -2,12 +2,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Bo
 
 # 核心修正：移除所有 'app.' 前缀，使导入相对于 /app 目录
 from core.grpc_client import grpc_client_manager
-from services.knowledge_base import kb_service
-from services.session_manager import (
-    create_session,
-    get_session_context,
-    append_message,
-)
+from services.knowledge_service import knowledge_service
+from services.session_service import session_service
 from protos import inference_pb2
 import logging
 import json
@@ -44,9 +40,9 @@ async def chat_api(
     query: str = Body(..., embed=True), session_id: str | None = Body(default=None)
 ):
     if not session_id:
-        session_id = create_session()
+        session_id = session_service.create_session()
 
-    history = get_session_context(session_id)
+    history = session_service.get_session_context(session_id)
 
     try:
         context_docs = await kb_service.search(query, n_results=3)
@@ -71,8 +67,8 @@ async def chat_api(
         logger.error(f"HTTP chat API error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-    append_message(session_id, {"role": "user", "content": query})
-    append_message(session_id, {"role": "assistant", "content": answer})
+    session_service.append_message(session_id, {"role": "user", "content": query})
+    session_service.append_message(session_id, {"role": "assistant", "content": answer})
 
     return {"session_id": session_id, "answer": answer}
 
@@ -89,7 +85,7 @@ async def websocket_chat(websocket: WebSocket):
             user_query = data.get("query", "").strip()
 
             if not session_id:
-                session_id = data.get("session_id") or create_session()
+                session_id = data.get("session_id") or session_service.create_session()
                 await websocket.send_text(
                     json.dumps({"event": "[ID]", "session_id": session_id})
                 )
@@ -97,8 +93,8 @@ async def websocket_chat(websocket: WebSocket):
             if not user_query:
                 continue
 
-            history = get_session_context(session_id)
-            context_docs = await kb_service.search(user_query, n_results=3)
+            history = session_service.get_session_context(session_id)
+            context_docs = await knowledge_service.search(user_query, n_results=3)
             context_contents = [doc.page_content for doc in context_docs]
             messages_for_grpc = build_final_messages_for_grpc(
                 user_query, context_contents, history
@@ -119,8 +115,8 @@ async def websocket_chat(websocket: WebSocket):
                 )
                 assistant_response += token
 
-            append_message(session_id, {"role": "user", "content": user_query})
-            append_message(
+            session_service.append_message(session_id, {"role": "user", "content": user_query})
+            session_service.append_message(
                 session_id, {"role": "assistant", "content": assistant_response}
             )
 
