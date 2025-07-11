@@ -132,11 +132,11 @@ const handleError = (error, file) => {
 
 // 上传前检查
 const beforeUpload = (file) => {
-  const isGGUF = file.name.endsWith('.gguf')
-  if (!isGGUF) {
-    ElMessage.error('只能上传 .gguf 格式的文件！')
+  const isValid = file.name.endsWith('.gguf') || file.name.endsWith('.safetensors')
+  if (!isValid) {
+    ElMessage.error('只能上传 .gguf 或 .safetensors 格式的文件！')
   }
-  return isGGUF
+  return isValid
 }
 
 // 组件加载时，自动获取一次列表
