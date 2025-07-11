@@ -100,19 +100,12 @@ Documents uploaded through the admin interface are saved under
 `knowledge_base_docs/`, which is mounted into the backend container for
 persistence. The following admin API endpoints are available:
 
-- `POST /api/admin/knowledge/upload` – upload a `.txt` file
-- `GET  /api/admin/knowledge/list` – list stored documents
-- `GET  /api/admin/knowledge/download?file=<name>` – download a document
-- `DELETE /api/admin/knowledge/delete?file=<name>` – remove a document
+- `POST /api/admin/kb/upload` – upload a `.txt` file
+- `GET  /api/admin/kb/documents` – list stored documents
+- `DELETE /api/admin/kb/documents/{doc_id}` – remove a document by ID
 
 The admin UI at `http://localhost:8081/knowledge-base` provides a simple file
 uploader for these operations.
-
-### Embedding API
-
-If an embedding model is loaded, the endpoint
-`GET /api/embedding/embed_doc?file_name=<name>` returns the vector embedding for
-a stored document.
 
 
 The `backend` and `inference` services use pinned Python package versions
