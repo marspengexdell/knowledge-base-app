@@ -82,17 +82,19 @@ defined, generation stops early whenever the substring appears in the output.
 
 ### Switching Models via API
 
-The backend exposes a `POST /api/admin/models/switch` endpoint. The request body
-must be JSON in the following form:
+Use `POST /api/admin/models/load/{model_name}` to load a different generation
+model. Replace `{model_name}` with the file name of a model located in the
+`models/` directory. No request body is required unless you want to specify a
+different `model_type`.
 
-```json
-{
-  "model_name": "your-model-file.gguf"
-}
+For example, to activate `my-model.gguf`:
+
+```bash
+curl -X POST http://localhost:8000/api/admin/models/load/my-model.gguf
 ```
 
-The backend will update `models/active_models.json` with the selected
-generation model.
+The backend updates `models/active_models.json` once the model has been
+successfully loaded.
 
 ### Managing Knowledge Documents
 
