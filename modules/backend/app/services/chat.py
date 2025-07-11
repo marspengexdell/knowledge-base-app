@@ -3,7 +3,7 @@ from fastapi.websockets import WebSocket
 
 from core.grpc_client import grpc_client_manager
 from protos import inference_pb2
-from services.knowledge_base import kb_service
+from services.knowledge_service import knowledge_service
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class ChatService:
 
         try:
             logger.info(f"正在为问题 '{query}' 检索知识库...")
-            context_docs = await kb_service.search(query=query, n_results=3)
+            context_docs = await knowledge_service.search(query=query, n_results=3)
             context_docs = [doc for doc in context_docs if doc.page_content and doc.page_content.strip()]
             
             messages = []
