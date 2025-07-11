@@ -21,8 +21,6 @@ async def list_models():
         models = await grpc_client_manager.list_models()
         return models
 
-        return model_service.list_models()
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
