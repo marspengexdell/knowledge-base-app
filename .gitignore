@@ -50,3 +50,4 @@ CACHED
 docker
 inference/llama_cpp_python-0.2.73-cp310-cp310-linux_x86_64.whl
 !/models/sample-model.gguf
+/knowledge-base-app
