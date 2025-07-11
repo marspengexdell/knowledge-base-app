@@ -2,7 +2,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Bo
 
 # 核心修正：移除所有 'app.' 前缀，使导入相对于 /app 目录
 from core.grpc_client import grpc_client_manager
-from services.knowledge_base import kb_service
+from services.knowledge_service import knowledge_service
 from services.session_manager import (
     create_session,
     get_session_context,
@@ -49,7 +49,7 @@ async def chat_api(
     history = get_session_context(session_id)
 
     try:
-        context_docs = await kb_service.search(query, n_results=3)
+        context_docs = await knowledge_service.search(query, n_results=3)
         context_contents = [doc.page_content for doc in context_docs]
         messages_for_grpc = build_final_messages_for_grpc(
             query, context_contents, history
@@ -98,7 +98,7 @@ async def websocket_chat(websocket: WebSocket):
                 continue
 
             history = get_session_context(session_id)
-            context_docs = await kb_service.search(user_query, n_results=3)
+            context_docs = await knowledge_service.search(user_query, n_results=3)
             context_contents = [doc.page_content for doc in context_docs]
             messages_for_grpc = build_final_messages_for_grpc(
                 user_query, context_contents, history

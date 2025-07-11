@@ -8,7 +8,7 @@ from services.embedding import embedding_model
 
 logger = logging.getLogger(__name__)
 
-class KnowledgeBaseService:
+class KnowledgeService:
     def __init__(self, storage_dir: Optional[str] = None) -> None:
         self.storage_dir = storage_dir or os.getenv("KNOWLEDGE_BASE_DOCS", "/knowledge_base_docs")
         os.makedirs(self.storage_dir, exist_ok=True)
@@ -90,4 +90,4 @@ class KnowledgeBaseService:
             logger.error(f"知识库搜索失败: {e}", exc_info=True)
             return []
 
-kb_service = KnowledgeBaseService()
+knowledge_service = KnowledgeService()
