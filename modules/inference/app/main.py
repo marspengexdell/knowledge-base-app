@@ -248,6 +248,16 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
         except FileNotFoundError:
             logger.warning(f"模型目录 {MODELS_PATH} 未找到。")
 
+        embed_models = []
+        embedding_root = os.path.join(MODELS_PATH, "embedding-model")
+        try:
+            if os.path.isdir(embedding_root):
+                for d in os.listdir(embedding_root):
+                    if os.path.isdir(os.path.join(embedding_root, d)):
+                        embed_models.append(d)
+        except FileNotFoundError:
+            logger.warning(f"嵌入模型目录 {embedding_root} 未找到。")
+
         current_gen = (
             model_manager.model_name
             if model_manager.status in (ModelStatus.READY, ModelStatus.LOADING)
@@ -257,7 +267,7 @@ class InferenceService(inference_pb2_grpc.InferenceServiceServicer):
 
         return inference_pb2.ModelListResponse(
             generation_models=gen_models,
-            embedding_models=[model_manager.embedding_model_name],
+            embedding_models=embed_models,
             current_generation_model=current_gen,
             current_embedding_model=model_manager.embedding_model_name,
             device=device,
