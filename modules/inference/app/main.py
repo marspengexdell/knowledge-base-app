@@ -133,22 +133,37 @@ class ModelManager:
                 self.status = ModelStatus.ERROR
                 self.error_message = str(e)
 
-    def _load_embedding_model(self):
+    def _load_embedding_model(self, model_name=None):
         try:
             embedding_root = os.path.join(MODELS_PATH, "embedding-model")
             embed_model_path = None
-            if os.path.isdir(embedding_root):
-                candidates = [os.path.join(embedding_root, d)
-                              for d in os.listdir(embedding_root)
-                              if os.path.isdir(os.path.join(embedding_root, d))]
-                if candidates:
-                    embed_model_path = candidates[0]
-                    logger.info(f"发现并加载本地嵌入模型: {embed_model_path}")
+
+            if model_name:
+                candidate_path = os.path.join(MODELS_PATH, model_name)
+                if os.path.isdir(candidate_path):
+                    embed_model_path = candidate_path
+                    logger.info(f"使用指定的本地嵌入模型: {embed_model_path}")
                 else:
-                    logger.warning(f"{embedding_root} 下未发现子目录，将回退到 HuggingFace 下载。")
+                    embed_model_path = model_name
+                    logger.info(f"使用指定的 HuggingFace 模型: {embed_model_path}")
+
             if not embed_model_path:
-                embed_model_path = "BAAI/bge-base-zh-v1.5"
-                logger.info(f"使用 HuggingFace 下载模型: {embed_model_path}")
+                if os.path.isdir(embedding_root):
+                    candidates = [
+                        os.path.join(embedding_root, d)
+                        for d in os.listdir(embedding_root)
+                        if os.path.isdir(os.path.join(embedding_root, d))
+                    ]
+                    if candidates:
+                        embed_model_path = candidates[0]
+                        logger.info(f"发现并加载本地嵌入模型: {embed_model_path}")
+                    else:
+                        logger.warning(
+                            f"{embedding_root} 下未发现子目录，将回退到 HuggingFace 下载。"
+                        )
+                if not embed_model_path:
+                    embed_model_path = "BAAI/bge-base-zh-v1.5"
+                    logger.info(f"使用 HuggingFace 下载模型: {embed_model_path}")
 
             device = "cuda" if IS_GPU_AVAILABLE else "cpu"
             self.embedding_model = SentenceTransformer(embed_model_path, device=device)
@@ -156,6 +171,9 @@ class ModelManager:
             logger.info(f"嵌入模型加载成功: {self.embedding_model_name}")
         except Exception as e:
             logger.error(f"加载嵌入模型出错: {e}", exc_info=True)
+            if model_name:
+                logger.info("尝试加载默认嵌入模型...")
+                self._load_embedding_model()
 
     def switch_embedding_model(self, embed_model_path: str):
         """Load a specific embedding model from the given path or HF repo."""
@@ -359,16 +377,41 @@ def serve():
     server.start()
     logger.info("gRPC 服务器已启动，监听端口 50051")
 
-    # 启动时加载嵌入模型和默认的生成模型
-    threading.Thread(target=model_manager._load_embedding_model, daemon=True).start()
+    # 启动时加载嵌入模型和生成模型
+    active_models_path = os.path.join(MODELS_PATH, "active_models.json")
+    gen_model_cfg = None
+    embed_model_cfg = None
+
+    if os.path.exists(active_models_path):
+        try:
+            with open(active_models_path, "r") as f:
+                cfg = json.load(f)
+            gen_model_cfg = cfg.get("generation")
+            embed_model_cfg = cfg.get("embedding")
+            logger.info(
+                f"从 active_models.json 读取到配置: generation={gen_model_cfg}, embedding={embed_model_cfg}"
+            )
+        except Exception as e:
+            logger.warning(f"读取 active_models.json 失败: {e}")
+
+    threading.Thread(
+        target=model_manager._load_embedding_model,
+        args=(embed_model_cfg,),
+        daemon=True,
+    ).start()
+
     try:
-        if os.path.isdir(MODELS_PATH):
+        if gen_model_cfg:
+            cfg_path = os.path.join(MODELS_PATH, gen_model_cfg)
+            if os.path.exists(cfg_path):
+                logger.info(f"加载配置中的生成模型: {gen_model_cfg}")
+                model_manager.switch_model(gen_model_cfg)
+            else:
+                logger.warning(f"指定的生成模型 {gen_model_cfg} 不存在，回退到默认逻辑。")
+
+        if model_manager.status != ModelStatus.LOADING and os.path.isdir(MODELS_PATH):
             available = sorted(
-                [
-                    f
-                    for f in os.listdir(MODELS_PATH)
-                    if f.endswith(".gguf")
-                ]
+                [f for f in os.listdir(MODELS_PATH) if f.endswith(".gguf")]
             )
             if available:
                 logger.info(f"找到默认模型，正在加载: {available[0]}")
@@ -376,7 +419,7 @@ def serve():
             else:
                 logger.warning(f"模型目录 {MODELS_PATH} 中没有找到 .gguf 模型文件。")
     except FileNotFoundError:
-        logger.error(f"模型目录 {MODELS_PATH} 不存在，无法加载默认模型。")
+        logger.error(f"模型目录 {MODELS_PATH} 不存在，无法加载生成模型。")
 
     try:
         while True:
