@@ -43,7 +43,7 @@ async def chat_api(
     history = session_service.get_session_context(session_id)
 
     try:
-        context_docs = await kb_service.search(query, n_results=3)
+        context_docs = await knowledge_service.search(query, n_results=3)
         context_contents = [doc.page_content for doc in context_docs]
         messages_for_grpc = build_final_messages_for_grpc(
             query, context_contents, history
