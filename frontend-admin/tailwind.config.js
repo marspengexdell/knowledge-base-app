@@ -1,7 +1,5 @@
-// frontend-admin/tailwind.config.js (修改后)
-
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: [
     "./index.html",
     "./src/**/*.{vue,js,ts,jsx,tsx}",
@@ -9,8 +7,7 @@ export default {
   theme: {
     extend: {},
   },
-  // 确保排版插件被正确引入
   plugins: [
     require('@tailwindcss/typography'),
   ],
-}
+};
