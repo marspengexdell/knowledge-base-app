@@ -21,15 +21,12 @@ COPY modules/backend/requirements.txt ./
 RUN pip install --upgrade pip && pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 COPY modules/backend /backend
 
-# 生产镜像（合并所有服务）
+# 最终镜像
 FROM python:3.10-slim
 
-# 安装必要工具和 chromadb
-RUN apt-get update && apt-get install -y supervisor && \
-    pip install --upgrade pip && \
-    pip install chromadb==0.4.24 fastapi uvicorn
+# 安装 supervisor
+RUN apt-get update && apt-get install -y supervisor
 
-# 设置路径
 WORKDIR /app
 
 # 拷贝后端
@@ -42,11 +39,11 @@ COPY --from=frontend-user-build /frontend-user/dist /app/frontend-user
 # 拷贝模型
 COPY models /models
 
-# 拷贝 supervisor 配置
+# supervisord 配置
 COPY supervisord.conf /etc/supervisord.conf
 
 # 环境变量
-ENV VECTOR_DB_URL=http://localhost:8001
+ENV CHROMA_PERSIST_DIR=/app/chroma_store
 ENV PYTHONUNBUFFERED=1
 ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
