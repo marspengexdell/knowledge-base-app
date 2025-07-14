@@ -52,3 +52,4 @@ inference/llama_cpp_python-0.2.73-cp310-cp310-linux_x86_64.whl
 !/models/sample-model.gguf
 /knowledge-base-app
 modules/backend/app/data/knowledge/d97e17ba-27eb-4407-86bc-4ea0060f5cb6_戴尔意外损坏服务【保障范围】.txt
+kbapp.tar 
