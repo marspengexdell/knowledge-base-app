@@ -33,7 +33,7 @@ async def switch_model(request: ModelSwitchRequest):
         await grpc_client_manager.connect()
     try:
         success, message = await grpc_client_manager.switch_model(
-            model_name, model_type_enum
+            model_name, model_type=model_type_enum
         )
         # 支持嵌入模型和生成模型的本地状态持久化
         if success:

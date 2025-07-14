@@ -64,11 +64,31 @@ class ModelManager:
         """Request the inference service to switch to the specified model."""
         model_path = self.get_model_path(model_name)
         if not model_path:
+<<<<<<< Updated upstream
             return False
         success, _ = await self.grpc_client_manager.switch_model(
             model_name, inference_pb2.ModelType.GENERATION
         )
         return success
+=======
+            logger.error(f"Model file not found for {model_name}")
+            return False, f"Model file not found: {model_name}"
+        try:
+            success, msg = await self.grpc_client_manager.switch_model(
+                model_name, model_type=inference_pb2.ModelType.GENERATION
+            )
+            logger.info(f"switch_model grpc response: success={success}, msg={msg}")
+            if success:
+                self.current_model_name = model_name
+            # 特殊处理 loading_busy
+            if msg == "loading_busy":
+                logger.warning(f"模型正在加载: {model_name}")
+                return False, "模型正在加载，请稍后再试。"
+            return success, msg
+        except Exception as e:
+            logger.error(f"gRPC 切换模型异常: {e}", exc_info=True)
+            return False, f"Exception: {str(e)}"
+>>>>>>> Stashed changes
 
     def is_embedding_model_loaded(self) -> bool:
         """Checks if the embedding model has been loaded into memory."""
