@@ -16,8 +16,8 @@ class VectorDBClient:
     """
 
     def __init__(self):
-        # 从环境变量获取ChromaDB的URL
-        db_url_str = os.getenv("VECTOR_DB_URL", "http://vector-db:8000")
+        # 从环境变量获取ChromaDB的URL，默认值适配 All-in-One 内嵌部署
+        db_url_str = os.getenv("VECTOR_DB_URL", "http://127.0.0.1:8001")
         logger.info(f"正在连接到向量数据库: {db_url_str}")
 
         try:
@@ -44,6 +44,7 @@ class VectorDBClient:
             )
         except Exception as e:
             logger.error(f"连接向量数据库失败: {e}", exc_info=True)
+            logger.error("请确保 Chroma 服务已通过 supervisord 启动，并监听在 http://127.0.0.1:8001")
             raise
 
     async def add_documents(
@@ -84,7 +85,6 @@ class VectorDBClient:
             docs_list = results.get("documents", [[]])
             distances_list = results.get("distances", [[]])
 
-            # 只遍历元数据（因为内容常在 metadata['text']）
             if metas_list and metas_list[0]:
                 for i, metadata in enumerate(metas_list[0]):
                     text = metadata.get("text", None)
@@ -123,5 +123,6 @@ class VectorDBClient:
             )
         except Exception as e:
             logger.error(f"从向量数据库中删除文档时出错: {e}", exc_info=True)
+
 
 vector_db = VectorDBClient()
