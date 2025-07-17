@@ -244,6 +244,10 @@ docker compose up --build
 
 Nginx exposes ports `80` and `443` while the individual services communicate
 through the internal Docker network.
+
+## Building a Private Image
+See [docs/secure-docker-build.md](docs/secure-docker-build.md) for steps to build the application without bundling the raw Python sources.
+
 =======
 ## Disclaimer
 
